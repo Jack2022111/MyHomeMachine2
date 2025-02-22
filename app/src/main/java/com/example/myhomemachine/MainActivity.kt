@@ -159,6 +159,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
 
 class MainActivity : AppCompatActivity() {
+    private var isLightOn = false
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -177,7 +178,9 @@ class MainActivity : AppCompatActivity() {
                         modifier = Modifier.padding(innerPadding),
                         sharedViewModel = sharedViewModel,
                         onTurnLightOn = { turnLightOn() },
-                        onTurnLightOff = { turnLightOff() }
+                        onTurnLightOff = { turnLightOff() },
+                        onBrightnessChange = { brightness -> setBrightness(brightness) },
+                        setBrightness = { brightness -> this.setBrightness(brightness) } // Passing the setBrightness function from MainActivity
                     )
                 }
             }
@@ -196,6 +199,7 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 Log.d("LIFX", "Light turned ON")
+                isLightOn = true
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light on", e)
             }
@@ -214,8 +218,28 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 Log.d("LIFX", "Light turned OFF")
+                isLightOn = false
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
+            }
+        }
+    }
+
+    fun setBrightness(brightness: Float) {
+        val apiService = RetrofitClient.instance
+        val powerState = if (isLightOn) "on" else "off"
+        val body = LightState(power = powerState, brightness = brightness)
+
+        lifecycleScope.launch {
+            try {
+                apiService.setLightState(
+                    selector = LIFX_SELECTOR,
+                    authHeader = "Bearer $LIFX_API_TOKEN",
+                    body = body
+                )
+                Log.d("LIFX", "Brightness set to $brightness")
+            } catch (e: Exception) {
+                Log.e("LIFX", "Failed to set brightness", e)
             }
         }
     }
@@ -326,6 +350,7 @@ fun FirstScreen(
                 )
             }
 
+
             // Bottom section with buttons for turning light on/off and sign in/up buttons
             Column(
                 modifier = Modifier
@@ -334,6 +359,8 @@ fun FirstScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // light on off buttons for firstscreen
+                /*
                 Button(
                     onClick = { onTurnLightOn() },
                     modifier = Modifier
@@ -379,8 +406,9 @@ fun FirstScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(text = "Turn Off Light")
                 }
+                */
 
-                // Your existing Login and Sign Up buttons...
+                // Existing Login and Sign Up buttons...
                 Button(
                     onClick = { navController.navigate("login") },
                     modifier = Modifier
@@ -1208,7 +1236,7 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
     val deviceTypes = listOf("Camera", "Light", "Plug", "Sensor")
     val devicesByType = mapOf(
         "Camera" to listOf("RaspberryPiCamera"),
-        "Light" to listOf("Glowbit_A14", "LumenRay_M76", "AuraNode_V02"),
+        "Light" to listOf("LIFX Smart Light"),  // Only one smart light option now
         "Plug" to listOf("Shelly Smart Plug"),  // Only one plug option now
         "Sensor" to listOf("ThermoSync_Q5", "BreezeIQ_G87")
     )
@@ -1443,7 +1471,8 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
 }
 
 
-
+//working lightscreen 2.0
+/*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LightsScreen(navController: NavHostController) {
@@ -1541,6 +1570,213 @@ fun LightsScreen(navController: NavHostController) {
         )
     }
 }
+
+*/
+
+//working lightscreen2.1
+/*
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LightsScreen(
+    navController: NavHostController,
+    onTurnLightOn: () -> Unit,   // Accept functions
+    onTurnLightOff: () -> Unit   // Accept functions
+) {
+    val knownLights = DeviceManager.knownLights
+    var selectedLight by remember { mutableStateOf<String?>(null) }
+    var isLightOn by remember { mutableStateOf(false) }
+    var selectedColor by remember { mutableStateOf(Color.White) }
+    var brightness by remember { mutableStateOf(0.8f) }
+    var showScheduleDialog by remember { mutableStateOf(false) }
+    var showConfirmation by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Lights Control") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+        ) {
+            LightSelectionCard(
+                knownLights = knownLights,
+                selectedLight = selectedLight,
+                onLightSelected = { selectedLight = it }
+            )
+
+            if (selectedLight != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                LightControlsCard(
+                    isLightOn = isLightOn,
+                    onPowerChange = {
+                        if (isLightOn) {
+                            onTurnLightOff()
+                        } else {
+                            onTurnLightOn()
+                        }
+                        isLightOn = !isLightOn
+                    },
+                    brightness = brightness,
+                    onBrightnessChange = { brightness = it },
+                    selectedColor = selectedColor
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                ColorSelectionCard(
+                    selectedColor = selectedColor,
+                    onColorSelected = { selectedColor = it }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                ActionButtons(
+                    onScheduleClick = { showScheduleDialog = true },
+                    onSaveClick = { showConfirmation = true }
+                )
+            }
+        }
+    }
+
+    if (showScheduleDialog) {
+        EnhancedScheduleDialog(onDismiss = { showScheduleDialog = false })
+    }
+
+    if (showConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showConfirmation = false },
+            title = { Text("Success") },
+            text = { Text("Light settings have been saved successfully.") },
+            confirmButton = {
+                Button(onClick = {
+                    showConfirmation = false
+                    navController.navigateUp()
+                }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+}
+
+ */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LightsScreen(
+    navController: NavHostController,
+    onTurnLightOn: () -> Unit,
+    onTurnLightOff: () -> Unit,
+    onBrightnessChange: (Float) -> Unit
+) {
+    val knownLights = DeviceManager.knownLights
+    var selectedLight by remember { mutableStateOf<String?>(null) }
+    var isLightOn by remember { mutableStateOf(false) }
+    var selectedColor by remember { mutableStateOf(Color.White) }
+    var brightness by remember { mutableStateOf(0.8f) }
+    var showScheduleDialog by remember { mutableStateOf(false) }
+    var showConfirmation by remember { mutableStateOf(false) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Lights Control") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+        ) {
+            LightSelectionCard(
+                knownLights = knownLights,
+                selectedLight = selectedLight,
+                onLightSelected = { selectedLight = it }
+            )
+
+            if (selectedLight != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                LightControlsCard(
+                    isLightOn = isLightOn,
+                    onPowerChange = {
+                        if (isLightOn) {
+                            onTurnLightOff()
+                        } else {
+                            onTurnLightOn()
+                        }
+                        isLightOn = !isLightOn
+                    },
+                    brightness = brightness,
+                    onBrightnessChange = {
+                        brightness = it
+                        onBrightnessChange(it)
+                    },
+                    selectedColor = selectedColor
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                ColorSelectionCard(
+                    selectedColor = selectedColor,
+                    onColorSelected = { selectedColor = it }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                ActionButtons(
+                    onScheduleClick = { showScheduleDialog = true },
+                    onSaveClick = { showConfirmation = true }
+                )
+            }
+        }
+    }
+
+    if (showScheduleDialog) {
+        EnhancedScheduleDialog(onDismiss = { showScheduleDialog = false })
+    }
+
+    if (showConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showConfirmation = false },
+            title = { Text("Success") },
+            text = { Text("Light settings have been saved successfully.") },
+            confirmButton = {
+                Button(onClick = {
+                    showConfirmation = false
+                    navController.navigateUp()
+                }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2431,7 +2667,9 @@ fun MyNavHost(
     modifier: Modifier = Modifier,
     sharedViewModel: SharedViewModel,
     onTurnLightOn: () -> Unit,
-    onTurnLightOff: () -> Unit
+    onTurnLightOff: () -> Unit,
+    onBrightnessChange: (Float) -> Unit,
+    setBrightness: (Float) -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -2468,8 +2706,14 @@ fun MyNavHost(
             )
         }
         composable("lights") {
-            LightsScreen(navController = navController)
+            LightsScreen(
+                navController = navController,
+                onTurnLightOn = onTurnLightOn,
+                onTurnLightOff = onTurnLightOff,
+                onBrightnessChange = { brightness -> setBrightness(brightness) }  // Pass the setBrightness function
+            )
         }
+
         composable("plugs") {
             val deviceController = DeviceController()  // Create an instance of DeviceController
             PlugsScreen(navController = navController, deviceController = deviceController)  // Pass it to PlugsScreen
