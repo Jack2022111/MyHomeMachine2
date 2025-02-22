@@ -123,6 +123,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.myhomemachine.data.DeviceManager
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.Call
@@ -2122,6 +2124,25 @@ private fun CustomColorPickerDialog(
     )
 }
 
+fun toggleMotionDetection(device: String, onComplete: () -> Unit) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val client = OkHttpClient()
+            val request = Request.Builder()
+                .url("http://10.5.2.37:5000/toggle_motion/$device")
+                .put(okhttp3.RequestBody.create(null, ByteArray(0))) // Empty PUT body
+                .build()
+
+            val response = client.newCall(request).execute()
+            if (response.isSuccessful) {
+                onComplete()  // Update UI state
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
+
 @Composable
 fun ColorButton(
     color: Color,
@@ -2350,6 +2371,9 @@ fun CamerasScreen(navController: NavHostController) {
     var selectedCamera by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
 
+    var motionDetectionLight by remember { mutableStateOf(true) }
+    var motionDetectionPlug by remember { mutableStateOf(true) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -2435,20 +2459,48 @@ fun CamerasScreen(navController: NavHostController) {
                                 WebView(context).apply {
                                     settings.javaScriptEnabled = true
                                     webViewClient = WebViewClient()
-                                    // Replace with your Raspberry Pi's IP address and port
-                                    loadUrl("http://10.5.2.37:5000/stream")
+                                    loadUrl("http://10.5.2.37:5000/stream")  // Replace with Raspberry Pi IP
                                 }
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(300.dp)
                         )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Toggle Motion Detection for Lights
+                        Button(
+                            onClick = {
+                                toggleMotionDetection("light") {
+                                    motionDetectionLight = !motionDetectionLight
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (motionDetectionLight) "Disable Light Motion Detection" else "Enable Light Motion Detection")
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Toggle Motion Detection for Plug
+                        Button(
+                            onClick = {
+                                toggleMotionDetection("plug") {
+                                    motionDetectionPlug = !motionDetectionPlug
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(if (motionDetectionPlug) "Disable Plug Motion Detection" else "Enable Plug Motion Detection")
+                        }
                     }
                 }
             }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
