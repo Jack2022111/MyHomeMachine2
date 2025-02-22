@@ -68,11 +68,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -184,7 +184,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun turnLightOn() {
+    private fun turnLightOn() {
         val apiService = RetrofitClient.instance
         val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
 
@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
                     authHeader = "Bearer $LIFX_API_TOKEN",
                     body = body
                 )
-                isLightOn = true  // ✅ Ensure the app remembers the light is on
+                isLightOn = true
                 Log.d("LIFX", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light on", e)
@@ -203,7 +203,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun turnLightOff() {
+    private fun turnLightOff() {
         val apiService = RetrofitClient.instance
         val body = LightState(power = "off", color = lastColor)
 
@@ -222,7 +222,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun setBrightness(brightness: Float) {
+    private fun setBrightness(brightness: Float) {
         currentBrightness = brightness // Store brightness
 
         val apiService = RetrofitClient.instance
@@ -247,7 +247,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // Function to convert Jetpack Compose Color to HSB
-    fun convertColorToHSB(color: Color): FloatArray {
+    private fun convertColorToHSB(color: Color): FloatArray {
         val hsv = FloatArray(3)
         android.graphics.Color.RGBToHSV(
             (color.red * 255).toInt(),
@@ -258,9 +258,9 @@ class MainActivity : AppCompatActivity() {
         return hsv
     }
 
-    fun setColor(color: Color) {
+    private fun setColor(color: Color) {
         val hsb = convertColorToHSB(color) // Convert Color to HSB
-        lastColor = "hue:${hsb[0]} saturation:${hsb[1]} brightness:$currentBrightness" // Use stored brightness
+        lastColor = "hue:${hsb[0]} saturation:${hsb[1]} brightness:$currentBrightness"
 
         val apiService = RetrofitClient.instance
         val body = LightState(color = lastColor, power = "on")
@@ -600,7 +600,6 @@ fun ShellyScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SignupScreen(navController: NavHostController) {
     var email by remember { mutableStateOf("") }
@@ -857,7 +856,6 @@ fun SignupScreen(navController: NavHostController) {
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(navController: NavHostController) {
     var email by remember { mutableStateOf("") }
@@ -1477,7 +1475,7 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
             text = {
                 Text(
                     "Add ${customDeviceName.ifEmpty { selectedDeviceName }} " +
-                            "to your ${selectedDeviceType} collection?"
+                            "to your $selectedDeviceType collection?"
                 )
             },
             confirmButton = {
@@ -1721,7 +1719,7 @@ fun LightsScreen(
     var selectedLight by remember { mutableStateOf<String?>(null) }
     var isLightOn by remember { mutableStateOf(false) }
     var selectedColor by remember { mutableStateOf(Color.White) }
-    var brightness by remember { mutableStateOf(0.8f) }
+    var brightness by remember { androidx.compose.runtime.mutableFloatStateOf(0.8f) }
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showConfirmation by remember { mutableStateOf(false) }
 
@@ -1883,7 +1881,7 @@ private fun LightControlsCard(
     onBrightnessChange: (Float) -> Unit,
     selectedColor: Color
 ) {
-    var rotationState by remember { mutableStateOf(0f) }
+    var rotationState by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val rotation by animateFloatAsState(
         targetValue = rotationState,
         animationSpec = tween(durationMillis = 1000, easing = LinearEasing)
@@ -2059,9 +2057,9 @@ private fun CustomColorPickerDialog(
     onColorSelected: (Color) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var red by remember { mutableStateOf(initialColor.red) }
-    var green by remember { mutableStateOf(initialColor.green) }
-    var blue by remember { mutableStateOf(initialColor.blue) }
+    var red by remember { androidx.compose.runtime.mutableFloatStateOf(initialColor.red) }
+    var green by remember { androidx.compose.runtime.mutableFloatStateOf(initialColor.green) }
+    var blue by remember { androidx.compose.runtime.mutableFloatStateOf(initialColor.blue) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -2438,7 +2436,7 @@ fun CamerasScreen(navController: NavHostController) {
                                     settings.javaScriptEnabled = true
                                     webViewClient = WebViewClient()
                                     // Replace with your Raspberry Pi's IP address and port
-                                    loadUrl("http://10.5.2.21:5000/stream")
+                                    loadUrl("http://10.5.2.37:5000/stream")
                                 }
                             },
                             modifier = Modifier
@@ -2570,7 +2568,7 @@ fun TemperatureDisplay(temperatureHistory: List<Int>) {
                     Text("$temp°F", style = MaterialTheme.typography.titleMedium)
                 }
                 if (index < temperatureHistory.lastIndex) {
-                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 }
             }
         }
@@ -2603,14 +2601,13 @@ fun AirQualityDisplay(airQualityHistory: List<Int>) {
                     Text("$quality AQI", style = MaterialTheme.typography.titleMedium)
                 }
                 if (index < airQualityHistory.lastIndex) {
-                    Divider(modifier = Modifier.padding(vertical = 4.dp))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulePage(navController: NavHostController) {
     Surface(
