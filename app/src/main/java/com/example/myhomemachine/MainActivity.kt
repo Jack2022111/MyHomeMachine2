@@ -1,327 +1,145 @@
 package com.example.myhomemachine
 
+import android.Manifest
+import android.app.Application
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.Alignment
-import androidx.compose.material3.TextField // add this import if it’s not present
-import androidx.compose.runtime.remember // add this import if it’s not present
-import androidx.compose.runtime.mutableStateOf // add this import if it’s not present
-import androidx.compose.runtime.*
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import com.example.myhomemachine.data.DeviceManager
-
-import androidx.compose.foundation.clickable
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.foundation.background
-import androidx.compose.ui.graphics.Color
+import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
-import androidx.compose.animation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.filled.*
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.SensorsOff
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.outlined.WbSunny
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.toArgb
-import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.material.icons.Icons
-
-import android.widget.Button
-import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.myhomemachine.data.DeviceManager
+import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.*
-import android.util.Log
-import androidx.fragment.app.FragmentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.compose.rememberNavController
-import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
-import android.provider.Settings
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.net.wifi.WifiNetworkSpecifier
-import android.net.ConnectivityManager
-import android.net.NetworkRequest
-import android.os.Build
-import androidx.annotation.RequiresApi
-import android.content.Intent
-import android.net.Network
-import android.net.NetworkCapabilities
-import androidx.compose.foundation.border
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.activity.viewModels
-import androidx.lifecycle.ViewModelProvider
-
 import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.compose.runtime.remember
-import androidx.compose.ui.viewinterop.AndroidView
 
+// LifeX API token: c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247
 
-
-/*
-class MainActivity : AppCompatActivity() {
-
-   // Initialize the DeviceController
-   private val deviceController = DeviceController()
-
-   override fun onCreate(savedInstanceState: Bundle?) {
-       super.onCreate(savedInstanceState)
-       setContentView(R.layout.activity_main)
-
-       // Initialize UI elements
-       val btnTurnOn: Button = findViewById(R.id.btnTurnOn)
-       val btnTurnOff: Button = findViewById(R.id.btnTurnOff)
-
-       // Set up button listeners to control the Shelly Plug
-       btnTurnOn.setOnClickListener {
-           deviceController.turnOnPlug()
-       }
-
-       btnTurnOff.setOnClickListener {
-           deviceController.turnOffPlug()
-       }
-   }
-
-   // Inner DeviceController class to control the plug
-   inner class DeviceController {
-       private val client = OkHttpClient()
-       private val shellyIpAddress = "http://10.5.2.30"  // Replace with your Shelly Plug's IP
-
-       // Function to turn on the Shelly Plug
-       fun turnOnPlug() {
-           val request = Request.Builder()
-               .url("$shellyIpAddress/relay/0/on")
-               .build()
-
-           makeRequest(request)
-       }
-
-       // Function to turn off the Shelly Plug
-       fun turnOffPlug() {
-           val request = Request.Builder()
-               .url("$shellyIpAddress/relay/0/off")
-               .build()
-
-           makeRequest(request)
-       }
-
-       private fun makeRequest(request: Request) {
-           client.newCall(request).enqueue(object : okhttp3.Callback {
-               override fun onFailure(call: okhttp3.Call, e: IOException) {
-                   e.printStackTrace()
-               }
-
-               override fun onResponse(call: okhttp3.Call, response: Response) {
-                   if (response.isSuccessful) {
-                       println("Request succeeded: ${response.body?.string()}")
-                   } else {
-                       println("Request failed: ${response.code}")
-                   }
-               }
-           })
-       }
-   }
-}
-
- */
-
-/*
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MyHomeMachineTheme {
-                val navController = rememberNavController()
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MyNavHost(navController = navController, modifier = Modifier.padding(innerPadding))
-                }
-            }
-        }
-    }
-}
-
- */
-/*
-class MainActivity : FragmentActivity() {
-    @RequiresApi(Build.VERSION_CODES.M)
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        checkAndRequestPermissions()
-
-        val logs = mutableStateListOf<String>()
-
-        // Initialize WifiScanner with the logging callback
-        val wifiScanner = WifiScanner(this) { log ->
-            logs.add(log) // Append log messages to the list
-        }
-
-        setContent {
-            MyHomeMachineTheme {
-                val navController = rememberNavController()
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MyNavHost(
-                        navController = navController,
-                        modifier = Modifier.padding(innerPadding),
-                        logs = logs,
-                        wifiScanner = wifiScanner
-                    )
-                }
-
-                // Pass logs and wifiScanner to the MainScreen
-                //MainScreen(navController, wifiScanner, logs)
-            }
-        }
-    }
-
-    private fun checkAndRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(
-                this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
-                LOCATION_PERMISSION_REQUEST_CODE
-            )
-        }
-    }
-
-    companion object {
-        private const val LOCATION_PERMISSION_REQUEST_CODE = 1
-    }
-}
-
- */
-
-/*
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-@Composable
-fun MainScreen(navController: NavHostController) {
-    val context = LocalContext.current
-    val activity = context as? FragmentActivity
-
-    // State for holding scan results
-    val scanResults = remember { mutableStateListOf<String>() }
-    val isLoading = remember { mutableStateOf(false) } // To track scan progress
-
-    // Initialize WifiScanner and provide a callback to update scan results
-    val wifiScanner = activity?.let {
-        WifiScanner(it) { results ->
-            scanResults.clear()
-            scanResults.addAll(results)
-            isLoading.value = false
-        }
-    }
-
-    // Handle permission check and scan button click
-    val onScanClick = {
-        isLoading.value = true // Set loading to true when scan starts
-        wifiScanner?.checkPermissionsAndScan()
-    }
-
-    // Displaying UI
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        content = {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Scan button
-                Button(
-                    onClick = { onScanClick() }, // Explicitly pass the lambda here
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Scan for Wi-Fi Networks")
-                }
-
-
-                // Loading indicator
-                if (isLoading.value) {
-                    CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
-                }
-
-                // Display scan results
-                if (scanResults.isEmpty()) {
-                    Text("No Wi-Fi networks found.")
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.padding(top = 16.dp)
-                    ) {
-                        items(scanResults) { ssid ->
-                            Text(ssid)
-                        }
-                    }
-                }
-            }
-        }
-    )
-}
-*/
+private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
+private const val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
 
 class SharedViewModel(application: Application) : AndroidViewModel(application) {
     val logs = mutableStateListOf<String>()
@@ -330,7 +148,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     lateinit var wifiScanner: WifiScanner
         private set
 
-    fun initialize(activity: FragmentActivity) {
+    fun initialize(activity: AppCompatActivity) {
         wifiScanner = WifiScanner(activity) { log ->
             logs.add(log)
         }
@@ -340,7 +158,7 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
 
 
 
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -357,9 +175,47 @@ class MainActivity : FragmentActivity() {
                     MyNavHost(
                         navController = navController,
                         modifier = Modifier.padding(innerPadding),
-                        sharedViewModel = sharedViewModel
+                        sharedViewModel = sharedViewModel,
+                        onTurnLightOn = { turnLightOn() },
+                        onTurnLightOff = { turnLightOff() }
                     )
                 }
+            }
+        }
+    }
+
+    fun turnLightOn() {
+        val apiService = RetrofitClient.instance
+        val body = LightState(power = "on", brightness = 1.0f)
+
+        lifecycleScope.launch {
+            try {
+                apiService.setLightState(
+                    selector = LIFX_SELECTOR,
+                    authHeader = "Bearer $LIFX_API_TOKEN",  // Ensure 'Bearer ' is included
+                    body = body
+                )
+                Log.d("LIFX", "Light turned ON")
+            } catch (e: Exception) {
+                Log.e("LIFX", "Failed to turn light on", e)
+            }
+        }
+    }
+
+    fun turnLightOff() {
+        val apiService = RetrofitClient.instance
+        val body = LightState(power = "off")
+
+        lifecycleScope.launch {
+            try {
+                apiService.setLightState(
+                    selector = LIFX_SELECTOR,
+                    authHeader = "Bearer $LIFX_API_TOKEN",
+                    body = body
+                )
+                Log.d("LIFX", "Light turned OFF")
+            } catch (e: Exception) {
+                Log.e("LIFX", "Failed to turn light off", e)
             }
         }
     }
@@ -378,53 +234,6 @@ class MainActivity : FragmentActivity() {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
     }
 }
-
-
-
-
-
-/*
-@RequiresApi(Build.VERSION_CODES.M)
-@Composable
-fun MainScreen(
-    navController: NavHostController,
-    wifiScanner: WifiScanner?,
-    logs: MutableList<String>
-) {
-    // Pass wifiScanner and logs to shellyscreen
-    ShellyScreen(navController = navController, wifiScanner = wifiScanner, logs = logs)
-}
-
- */
-
-
-/*
-@Composable
-fun MainScreen(
-    navController: NavHostController,
-    wifiScanner: WifiScanner?,
-    logs: MutableList<String>
-) {
-    val activity = LocalContext.current as? FragmentActivity
-
-    // Debugging: Check if wifiScanner is null
-    //Log.d("MainScreen", "Activity: $activity")
-
-    val wifiScanner = activity?.let {
-        Log.d("MainScreen", "Initializing WifiScanner")
-        WifiScanner(it)
-    }
-
-    //Log.d("MainScreen", "wifiScanner: $wifiScanner")
-
-    // Pass wifiScanner to FirstScreen (can be null if activity is not a ComponentActivity)
-    FirstScreen(navController, wifiScanner = wifiScanner, logs = logs)
-}
-
- */
-
-
-
 
 // DeviceController class to manage the Shelly Plug
 class DeviceController {
@@ -465,53 +274,12 @@ class DeviceController {
     }
 }
 
-/*
-class DeviceController {
-    private val client = OkHttpClient()
-    private val shellyIpAddress = "http://10.5.2.30" // Shelly plug IP (this is specifically for b2 wifi network it will change later)
-
-    // Function to turn on the Shelly Plug
-    fun turnOnPlug() {
-        val request = Request.Builder()
-            .url("$shellyIpAddress/relay/0?turn=on")
-            .build()
-
-        makeRequest(request, "Turn On")
-    }
-
-    // Function to turn off the Shelly Plug
-    fun turnOffPlug() {
-        val request = Request.Builder()
-            .url("$shellyIpAddress/relay/0?turn=off")
-            .build()
-
-        makeRequest(request, "Turn Off")
-    }
-
-    // Send the request and log the response
-    private fun makeRequest(request: Request, action: String) {
-        client.newCall(request).enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                Log.e("DeviceController", "Request failed for $action: ${e.message}")
-            }
-
-            override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful) {
-                    Log.d("DeviceController", "Request succeeded for $action: ${response.body?.string()}")
-                } else {
-                    Log.e("DeviceController", "Request failed for $action: ${response.code}")
-                }
-            }
-        })
-    }
-}
-
- */
-
-
-
 @Composable
-fun FirstScreen(navController: NavHostController) {
+fun FirstScreen(
+    navController: NavHostController,
+    onTurnLightOn: () -> Unit,
+    onTurnLightOff: () -> Unit
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -558,7 +326,7 @@ fun FirstScreen(navController: NavHostController) {
                 )
             }
 
-            // Bottom section with Sign-in/login buttons
+            // Bottom section with buttons for turning light on/off and sign in/up buttons
             Column(
                 modifier = Modifier
                     .padding(bottom = 32.dp)
@@ -566,6 +334,53 @@ fun FirstScreen(navController: NavHostController) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                Button(
+                    onClick = { onTurnLightOn() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .animateContentSize(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lightbulb,
+                        contentDescription = "Turn On Light",
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Turn On Light")
+                }
+
+                Button(
+                    onClick = { onTurnLightOff() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .animateContentSize(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lightbulb, // Alternatively, use a different icon for off
+                        contentDescription = "Turn Off Light",
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "Turn Off Light")
+                }
+
+                // Your existing Login and Sign Up buttons...
                 Button(
                     onClick = { navController.navigate("login") },
                     modifier = Modifier
@@ -621,261 +436,6 @@ fun FirstScreen(navController: NavHostController) {
         }
     }
 }
-
-
-
-
-/*
-@Composable
-fun FirstScreen(
-    navController: NavHostController,
-    wifiScanner: WifiScanner? = null,
-    logs: MutableList<String>
-) {
-    val deviceController = DeviceController()
-    //val logs = remember { mutableStateListOf<String>() } // Mutable state for logs
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top section with logo
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "App Logo",
-                    modifier = Modifier
-                        .size(200.dp)
-                        .padding(16.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            // Middle section with welcome text
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Welcome to",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = "MyHomeMachine",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Logs and buttons section
-            Column(
-                modifier = Modifier
-                    .padding(bottom = 32.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Logs section
-                Text(
-                    text = "Logs",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Column(
-                    modifier = Modifier
-                        .height(150.dp)
-                        .fillMaxWidth()
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            shape = MaterialTheme.shapes.medium
-                        )
-                        .padding(8.dp)
-                ) {
-                    logs.forEach { log ->
-                        Text(text = log, style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-
-                // Clear Logs button
-                Button(
-                    onClick = { logs.clear() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    )
-                ) {
-                    Text(text = "Clear Logs")
-                }
-
-                // Navigation and control buttons
-                wifiScanner?.let {
-                    Button(
-                        onClick = { it.checkPermissionsAndScan() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
-                        )
-                    ) {
-                        Text(text = "Scan for Shelly Plug")
-                    }
-                }
-            }
-        }
-    }
-}
-
-*/
-
-/*
-@RequiresApi(Build.VERSION_CODES.M)
-@Composable
-fun ShellyScreen(
-    navController: NavHostController,
-    wifiScanner: WifiScanner? = null,
-    logs: MutableList<String>
-) {
-    val deviceController = DeviceController()
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Top section with logo
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "App Logo",
-                    modifier = Modifier
-                        .size(200.dp)
-                        .padding(16.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            // Middle section with welcome text
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Welcome to",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = "MyHomeMachine",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            // Logs and buttons section
-            Column(
-                modifier = Modifier
-                    .padding(bottom = 32.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Logs Section
-                Text(
-                    text = "Logs",
-                    style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                Column(
-                    modifier = Modifier
-                        .height(150.dp)
-                        .fillMaxWidth()
-                        .border(1.dp, MaterialTheme.colorScheme.onBackground)
-                        .padding(8.dp)
-                ) {
-                    // Scrollable logs display
-                    LazyColumn {
-                        items(logs) { log ->
-                            Text(text = log, style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-
-                // Clear Logs Button
-                Button(
-                    onClick = { logs.clear() },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-                ) {
-                    Text(text = "Clear Logs")
-                }
-
-                // Control Buttons
-                Button(
-                    onClick = {
-                        logs.add("Turning on Shelly Plug...")
-                        deviceController.turnOnPlug()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = "Turn On Plug")
-                }
-
-                Button(
-                    onClick = {
-                        logs.add("Turning off Shelly Plug...")
-                        deviceController.turnOffPlug()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(text = "Turn Off Plug")
-                }
-
-                wifiScanner?.let {
-                    Button(
-                        onClick = {
-                            logs.add("Scanning for Wi-Fi networks...")
-                            it.checkPermissionsAndScan()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(text = "Scan for Wi-Fi")
-                    }
-                }
-            }
-        }
-    }
-}
-
- */
-
 
 @RequiresApi(Build.VERSION_CODES.M)
 @Composable
@@ -978,179 +538,6 @@ fun ShellyScreen(
         }
     }
 }
-
-
-
-/*
-@Composable
-fun FirstScreen(navController: NavHostController, wifiScanner: WifiScanner? = null) {
-    val deviceController = DeviceController()
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-
-            // Top section with logo
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "App Logo",
-                    modifier = Modifier
-                        .size(200.dp)
-                        .padding(16.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
-
-            // Middle section with welcome text
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Welcome to",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text(
-                    text = "MyHomeMachine",
-                    style = MaterialTheme.typography.headlineLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            // Other UI elements (logo, welcome text, etc.)
-
-            Column(
-                modifier = Modifier
-                    .padding(bottom = 32.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-
-                // Navigation and control buttons...
-                Button(
-                    onClick = { navController.navigate("login") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .animateContentSize(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Login",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-
-                Button(
-                    onClick = { navController.navigate("signup") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .animateContentSize(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Sign Up",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-
-                // Only show Scan button if wifiScanner is not null
-                wifiScanner?.let {
-                    Log.d("FirstScreen", "WifiScanner is not null, showing scan button")
-                    Button(
-                        onClick = { it.checkPermissionsAndScan() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
-                        )
-                    ) {
-                        Text(text = "Scan for Shelly Plug")
-                    }
-                } ?: Log.d("FirstScreen", "WifiScanner is null")
-
-
-                // Turn On/Off buttons for Shelly Plug
-                Button(
-                    onClick = { deviceController.turnOnPlug() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.tertiary
-                    )
-                ) {
-                    Text(text = "Turn On Shelly Plug")
-                }
-
-                Button(
-                    onClick = { deviceController.turnOffPlug() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text(text = "Turn Off Shelly Plug")
-                }
-            }
-        }
-    }
-}
- */
-/*
-@Preview(showBackground = true)
-@Composable
-fun FirstScreenPreview() {
-    MyHomeMachineTheme {
-        FirstScreen(navController = rememberNavController())
-    }
-}
-
- */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1806,259 +1193,6 @@ private data class DeviceCategory(
     val icon: ImageVector,
     val route: String
 )
-
-/*
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController) {
-    // State variables
-    var selectedDeviceType by remember { mutableStateOf("") }
-    var selectedDeviceName by remember { mutableStateOf<String?>(null) }
-    var customDeviceName by remember { mutableStateOf("") }
-    var typeExpanded by remember { mutableStateOf(false) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
-
-    // Define device types and associated device names
-    val deviceTypes = listOf("Camera", "Light", "Plug", "Sensor")
-    val devicesByType = mapOf(
-        "Camera" to listOf("ZephyrCam_X21", "FlashEye_T39"),
-        "Light" to listOf("Glowbit_A14", "LumenRay_M76", "AuraNode_V02"),
-        "Plug" to listOf("PulsePlug_XZ99", "VoltSpot_35P"),
-        "Sensor" to listOf("ThermoSync_Q5", "BreezeIQ_G87")
-    )
-
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Add New Device") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Device Type Selection Card
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "1. Select Device Type",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    ExposedDropdownMenuBox(
-                        expanded = typeExpanded,
-                        onExpandedChange = { typeExpanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedDeviceType,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Device Type") },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
-                        )
-
-                        ExposedDropdownMenu(
-                            expanded = typeExpanded,
-                            onDismissRequest = { typeExpanded = false }
-                        ) {
-                            deviceTypes.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type) },
-                                    onClick = {
-                                        selectedDeviceType = type
-                                        selectedDeviceName = null
-                                        typeExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = when (type) {
-                                                "Camera" -> Icons.Default.Videocam
-                                                "Light" -> Icons.Default.LightMode
-                                                "Plug" -> Icons.Default.Power
-                                                else -> Icons.Default.Sensors
-                                            },
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Device Selection Card
-            if (selectedDeviceType.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "2. Select Available Device",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        devicesByType[selectedDeviceType]?.forEach { device ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedDeviceName = device }
-                                    .padding(vertical = 8.dp, horizontal = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = selectedDeviceName == device,
-                                    onClick = { selectedDeviceName = device }
-                                )
-                                Text(device)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Custom Name Card
-            if (selectedDeviceName != null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "3. Set Custom Name (Optional)",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = customDeviceName,
-                            onValueChange = { customDeviceName = it },
-                            label = { Text("Custom Name") },
-                            modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text(selectedDeviceName ?: "") }
-                        )
-                    }
-                }
-            }
-
-
-            // shelly device add screen
-            Column(
-                modifier = Modifier
-                    .padding(bottom = 32.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Button(
-                    onClick = { navController.navigate("shelly") }, // Replace "shelly" with "main_screen"
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .animateContentSize(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Text("Navigate to add Shelly Smart Plug")
-                }
-            }
-
-
-
-            // Add Device Button
-            if (selectedDeviceName != null) {
-                Button(
-                    onClick = { showConfirmDialog = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Add Device")
-                }
-            }
-        }
-    }
-
-    // Confirmation Dialog
-    if (showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
-            title = { Text("Add Device") },
-            text = {
-                Text(
-                    "Add ${customDeviceName.ifEmpty { selectedDeviceName }} " +
-                            "to your ${selectedDeviceType} collection?"
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val deviceName = customDeviceName.ifEmpty { selectedDeviceName ?: "" }
-                        DeviceManager.addDevice(deviceName, selectedDeviceType)
-                        showConfirmDialog = false
-                        navController.navigate("home") {
-                            popUpTo("home") { inclusive = false }
-                        }
-                    }
-                ) {
-                    Text("Confirm")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
-
- */
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -3290,37 +2424,14 @@ fun SchedulePage(navController: NavHostController) {
     }
 }
 
-/*
 @RequiresApi(Build.VERSION_CODES.M)
 @Composable
 fun MyNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
-    sharedViewModel: SharedViewModel
-) {
-    NavHost(navController = navController, startDestination = "first", modifier = modifier) {
-        composable("shelly") { ShellyScreen(navController = navController, wifiScanner = wifiScanner, logs = logs) }
-        composable("first") { FirstScreen(navController) }
-        composable("login") { LoginScreen(navController) }
-        composable("signup") { SignupScreen(navController) }
-        composable("home") { HomeScreen(navController = navController) }
-        composable("addDevice") { AddDeviceScreen(onDeviceAdded = { navController.popBackStack() }, navController = navController) }
-        composable("lights") { LightsScreen(navController = navController) }
-        composable("plugs") { PlugsScreen(navController = navController) }
-        composable("cameras") { CamerasScreen(navController = navController) }
-        composable("sensors") { SensorsScreen(navController = navController) }
-        composable("schedule") {SchedulePage(navController = navController)}
-    }
-}
-
- */
-
-@RequiresApi(Build.VERSION_CODES.M)
-@Composable
-fun MyNavHost(
-    navController: NavHostController,
-    modifier: Modifier = Modifier,
-    sharedViewModel: SharedViewModel
+    sharedViewModel: SharedViewModel,
+    onTurnLightOn: () -> Unit,
+    onTurnLightOff: () -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -3335,7 +2446,11 @@ fun MyNavHost(
             )
         }
         composable("first") {
-            FirstScreen(navController)
+            FirstScreen(
+                navController = navController,
+                onTurnLightOn = onTurnLightOn,
+                onTurnLightOff = onTurnLightOff
+            )
         }
         composable("login") {
             LoginScreen(navController)
