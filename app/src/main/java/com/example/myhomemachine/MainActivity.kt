@@ -15,9 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -46,7 +44,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.LightMode
@@ -136,8 +133,6 @@ import okhttp3.Response
 import java.io.IOException
 import kotlin.math.roundToInt
 
-// LifeX API token: c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247
-
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
 private const val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
 
@@ -155,11 +150,12 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     }
 }
 
-
-
-
 class MainActivity : AppCompatActivity() {
     private var isLightOn = false
+    private var lastColor: String = "hue:0 saturation:0 brightness:1" // Default color (White)
+    private var currentBrightness: Float = 0.8f // Default brightness (80%)
+
+
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -180,7 +176,8 @@ class MainActivity : AppCompatActivity() {
                         onTurnLightOn = { turnLightOn() },
                         onTurnLightOff = { turnLightOff() },
                         onBrightnessChange = { brightness -> setBrightness(brightness) },
-                        setBrightness = { brightness -> this.setBrightness(brightness) } // Passing the setBrightness function from MainActivity
+                        setBrightness = { brightness -> this.setBrightness(brightness) },
+                        onSetColor = { color -> setColor(color) }
                     )
                 }
             }
@@ -189,26 +186,7 @@ class MainActivity : AppCompatActivity() {
 
     fun turnLightOn() {
         val apiService = RetrofitClient.instance
-        val body = LightState(power = "on", brightness = 1.0f)
-
-        lifecycleScope.launch {
-            try {
-                apiService.setLightState(
-                    selector = LIFX_SELECTOR,
-                    authHeader = "Bearer $LIFX_API_TOKEN",  // Ensure 'Bearer ' is included
-                    body = body
-                )
-                Log.d("LIFX", "Light turned ON")
-                isLightOn = true
-            } catch (e: Exception) {
-                Log.e("LIFX", "Failed to turn light on", e)
-            }
-        }
-    }
-
-    fun turnLightOff() {
-        val apiService = RetrofitClient.instance
-        val body = LightState(power = "off")
+        val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
 
         lifecycleScope.launch {
             try {
@@ -217,8 +195,27 @@ class MainActivity : AppCompatActivity() {
                     authHeader = "Bearer $LIFX_API_TOKEN",
                     body = body
                 )
+                isLightOn = true  // ✅ Ensure the app remembers the light is on
+                Log.d("LIFX", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
+            } catch (e: Exception) {
+                Log.e("LIFX", "Failed to turn light on", e)
+            }
+        }
+    }
+
+    fun turnLightOff() {
+        val apiService = RetrofitClient.instance
+        val body = LightState(power = "off", color = lastColor)
+
+        lifecycleScope.launch {
+            try {
+                apiService.setLightState(
+                    selector = LIFX_SELECTOR,
+                    authHeader = "Bearer $LIFX_API_TOKEN",
+                    body = body
+                )
+                isLightOn = false // ✅ Make sure this updates correctly
                 Log.d("LIFX", "Light turned OFF")
-                isLightOn = false
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
             }
@@ -226,9 +223,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun setBrightness(brightness: Float) {
+        currentBrightness = brightness // Store brightness
+
         val apiService = RetrofitClient.instance
-        val powerState = if (isLightOn) "on" else "off"
-        val body = LightState(power = powerState, brightness = brightness)
+        val body = LightState(
+            power = "on", // Always keep the light on when changing brightness
+            brightness = brightness,
+            color = lastColor
+        )
 
         lifecycleScope.launch {
             try {
@@ -240,6 +242,39 @@ class MainActivity : AppCompatActivity() {
                 Log.d("LIFX", "Brightness set to $brightness")
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to set brightness", e)
+            }
+        }
+    }
+
+    // Function to convert Jetpack Compose Color to HSB
+    fun convertColorToHSB(color: Color): FloatArray {
+        val hsv = FloatArray(3)
+        android.graphics.Color.RGBToHSV(
+            (color.red * 255).toInt(),
+            (color.green * 255).toInt(),
+            (color.blue * 255).toInt(),
+            hsv
+        )
+        return hsv
+    }
+
+    fun setColor(color: Color) {
+        val hsb = convertColorToHSB(color) // Convert Color to HSB
+        lastColor = "hue:${hsb[0]} saturation:${hsb[1]} brightness:$currentBrightness" // Use stored brightness
+
+        val apiService = RetrofitClient.instance
+        val body = LightState(color = lastColor, power = "on")
+
+        lifecycleScope.launch {
+            try {
+                apiService.setLightState(
+                    selector = LIFX_SELECTOR,
+                    authHeader = "Bearer $LIFX_API_TOKEN",
+                    body = body
+                )
+                Log.d("LIFX", "Color set to HSB: ${hsb[0]}, ${hsb[1]}, ${hsb[2]}")
+            } catch (e: Exception) {
+                Log.e("LIFX", "Failed to set color", e)
             }
         }
     }
@@ -300,9 +335,7 @@ class DeviceController {
 
 @Composable
 fun FirstScreen(
-    navController: NavHostController,
-    onTurnLightOn: () -> Unit,
-    onTurnLightOff: () -> Unit
+    navController: NavHostController
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -759,7 +792,7 @@ fun SignupScreen(navController: NavHostController) {
                         else -> {
                             isLoading = true
                             scope.launch {
-                                kotlinx.coroutines.delay(1000) // Simulate network delay
+                                delay(1000) // Simulate network delay
                                 isLoading = false
                                 signupSuccess = true
                             }
@@ -1681,7 +1714,8 @@ fun LightsScreen(
     navController: NavHostController,
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit,
-    onBrightnessChange: (Float) -> Unit
+    onBrightnessChange: (Float) -> Unit,
+    onSetColor: (Color) -> Unit
 ) {
     val knownLights = DeviceManager.knownLights
     var selectedLight by remember { mutableStateOf<String?>(null) }
@@ -1730,10 +1764,11 @@ fun LightsScreen(
                     onPowerChange = {
                         if (isLightOn) {
                             onTurnLightOff()
+                            isLightOn = false
                         } else {
                             onTurnLightOn()
+                            isLightOn = true
                         }
-                        isLightOn = !isLightOn
                     },
                     brightness = brightness,
                     onBrightnessChange = {
@@ -1743,9 +1778,14 @@ fun LightsScreen(
                     selectedColor = selectedColor
                 )
                 Spacer(modifier = Modifier.height(16.dp))
+
                 ColorSelectionCard(
                     selectedColor = selectedColor,
-                    onColorSelected = { selectedColor = it }
+                    onColorSelected = { color ->
+                        selectedColor = color
+                        onSetColor(color)
+                    },
+                    setColor = onSetColor // Pass setColor function properly
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 ActionButtons(
@@ -1777,7 +1817,7 @@ fun LightsScreen(
     }
 }
 
-
+// USED FOR SELECTING WHICH LIGHT YOU WANT TO USE
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LightSelectionCard(
@@ -1833,6 +1873,7 @@ private fun LightSelectionCard(
         }
     }
 }
+
 
 @Composable
 private fun LightControlsCard(
@@ -1928,7 +1969,8 @@ private fun LightControlsCard(
 @Composable
 private fun ColorSelectionCard(
     selectedColor: Color,
-    onColorSelected: (Color) -> Unit
+    onColorSelected: (Color) -> Unit,
+    setColor: (Color) -> Unit // Add this parameter
 ) {
     var showCustomColorPicker by remember { mutableStateOf(false) }
 
@@ -1947,7 +1989,6 @@ private fun ColorSelectionCard(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // Predefined colors grid
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -1956,30 +1997,30 @@ private fun ColorSelectionCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    ColorButton(Color.Red, selectedColor, onColorSelected)
-                    ColorButton(Color.Green, selectedColor, onColorSelected)
-                    ColorButton(Color.Blue, selectedColor, onColorSelected)
-                    ColorButton(Color.Yellow, selectedColor, onColorSelected)
+                    ColorButton(Color.Red, selectedColor, onColorSelected, setColor)
+                    ColorButton(Color.Green, selectedColor, onColorSelected, setColor)
+                    ColorButton(Color.Blue, selectedColor, onColorSelected, setColor)
+                    ColorButton(Color.Yellow, selectedColor, onColorSelected, setColor)
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    ColorButton(Color.Magenta, selectedColor, onColorSelected)
-                    ColorButton(Color.Cyan, selectedColor, onColorSelected)
-                    ColorButton(Color.White, selectedColor, onColorSelected)
-                    ColorButton(Color(0xFFFF8C00), selectedColor, onColorSelected) // Orange
+                    ColorButton(Color.Magenta, selectedColor, onColorSelected, setColor)
+                    ColorButton(Color.Cyan, selectedColor, onColorSelected, setColor)
+                    ColorButton(Color.White, selectedColor, onColorSelected, setColor)
+                    ColorButton(Color(0xFFFF8C00), selectedColor, onColorSelected, setColor) // Orange
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    ColorButton(Color(0xFF800080), selectedColor, onColorSelected) // Purple
-                    ColorButton(Color(0xFF98FB98), selectedColor, onColorSelected) // Pale green
-                    ColorButton(Color(0xFF87CEEB), selectedColor, onColorSelected) // Sky blue
-                    ColorButton(Color(0xFFFFB6C1), selectedColor, onColorSelected) // Light pink
+                    ColorButton(Color(0xFF800080), selectedColor, onColorSelected, setColor) // Purple
+                    ColorButton(Color(0xFF98FB98), selectedColor, onColorSelected, setColor) // Pale green
+                    ColorButton(Color(0xFF87CEEB), selectedColor, onColorSelected, setColor) // Sky blue
+                    ColorButton(Color(0xFFFFB6C1), selectedColor, onColorSelected, setColor) // Light pink
                 }
             }
 
@@ -2084,36 +2125,28 @@ private fun CustomColorPickerDialog(
 }
 
 @Composable
-private fun ColorButton(
+fun ColorButton(
     color: Color,
     selectedColor: Color,
-    onColorSelected: (Color) -> Unit
+    onColorSelected: (Color) -> Unit,
+    setColor: (Color) -> Unit
 ) {
-    val size by animateFloatAsState(
-        targetValue = if (color == selectedColor) 52f else 48f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        )
-    )
-
-    Box(
+    Button(
+        onClick = {
+            onColorSelected(color)
+            setColor(color) // Change the light color
+        },
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color
+        ),
         modifier = Modifier
-            .size(size.dp)
-            .clip(CircleShape)
-            .background(color)
-            .clickable { onColorSelected(color) }
-            .padding(4.dp)
-    ) {
-        if (color == selectedColor) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                tint = if (color == Color.White) Color.Black else Color.White,
-                modifier = Modifier.align(Alignment.Center)
+            .size(48.dp)
+            .border(
+                width = if (color == selectedColor) 2.dp else 0.dp,
+                color = Color.Black,
+                shape = CircleShape
             )
-        }
-    }
+    ) {}
 }
 
 @Composable
@@ -2669,7 +2702,8 @@ fun MyNavHost(
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit,
     onBrightnessChange: (Float) -> Unit,
-    setBrightness: (Float) -> Unit
+    setBrightness: (Float) -> Unit,
+    onSetColor: (Color) -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -2685,9 +2719,7 @@ fun MyNavHost(
         }
         composable("first") {
             FirstScreen(
-                navController = navController,
-                onTurnLightOn = onTurnLightOn,
-                onTurnLightOff = onTurnLightOff
+                navController = navController
             )
         }
         composable("login") {
@@ -2710,7 +2742,8 @@ fun MyNavHost(
                 navController = navController,
                 onTurnLightOn = onTurnLightOn,
                 onTurnLightOff = onTurnLightOff,
-                onBrightnessChange = { brightness -> setBrightness(brightness) }  // Pass the setBrightness function
+                onBrightnessChange = { brightness -> setBrightness(brightness) },
+                onSetColor = onSetColor
             )
         }
 

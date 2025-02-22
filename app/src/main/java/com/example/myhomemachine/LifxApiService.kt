@@ -10,7 +10,8 @@ import retrofit2.http.Path
 // Define the LightState data class
 data class LightState(
     val power: String,        // "on" or "off"
-    val brightness: Float? = null // Optional brightness (0.0 - 1.0)
+    val brightness: Float? = null, // Optional brightness (0.0 - 1.0)
+    val color: String? = null
 )
 
 interface LifxApiService {

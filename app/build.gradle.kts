@@ -69,6 +69,8 @@ dependencies {
     // For animations
     implementation("com.google.accompanist:accompanist-navigation-animation:0.30.1")
 
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
     // For extended icons
     implementation("androidx.compose.material:material-icons-extended:1.5.4")
     // For custom fonts
