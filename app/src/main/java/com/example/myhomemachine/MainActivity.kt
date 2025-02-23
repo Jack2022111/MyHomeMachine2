@@ -1,22 +1,17 @@
 package com.example.myhomemachine
 
-import android.Manifest
-import android.app.Application
-import android.content.pm.PackageManager
-import android.os.Build
+import android.Manifest.permission
+import android.app.Application as AndroidApplication
 import android.os.Bundle
-import android.util.Log
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.TextField
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -38,7 +33,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -105,6 +99,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.animation.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -113,9 +112,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -123,8 +119,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.myhomemachine.data.DeviceManager
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.Call
@@ -133,7 +127,57 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.*
+import android.util.Log
+import androidx.fragment.app.FragmentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.LocalContext
+import androidx.navigation.compose.rememberNavController
+import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.LocationManager
+import android.net.wifi.ScanResult
+import android.net.wifi.WifiManager
+import android.provider.Settings
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import android.net.wifi.WifiNetworkSpecifier
+import android.net.ConnectivityManager
+import android.net.NetworkRequest
+import android.os.Build
+import androidx.annotation.RequiresApi
+import android.content.Intent
+import android.net.Network
+import android.net.NetworkCapabilities
+import androidx.compose.foundation.border
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.activity.viewModels
+import androidx.lifecycle.ViewModelProvider
+
 import kotlin.math.roundToInt
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import androidx.compose.runtime.remember
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.myhomemachine.network.AuthViewModel
+import com.example.myhomemachine.SettingsScreen
+
 
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
 private const val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
@@ -336,9 +380,7 @@ class DeviceController {
 }
 
 @Composable
-fun FirstScreen(
-    navController: NavHostController
-) {
+fun FirstScreen(navController: NavHostController) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -385,8 +427,7 @@ fun FirstScreen(
                 )
             }
 
-
-            // Bottom section with buttons for turning light on/off and sign in/up buttons
+            // Bottom section with Sign-in/login buttons
             Column(
                 modifier = Modifier
                     .padding(bottom = 32.dp)
@@ -394,56 +435,6 @@ fun FirstScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // light on off buttons for firstscreen
-                /*
-                Button(
-                    onClick = { onTurnLightOn() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .animateContentSize(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Lightbulb,
-                        contentDescription = "Turn On Light",
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Turn On Light")
-                }
-
-                Button(
-                    onClick = { onTurnLightOff() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .animateContentSize(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Lightbulb, // Alternatively, use a different icon for off
-                        contentDescription = "Turn Off Light",
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = "Turn Off Light")
-                }
-                */
-
-                // Existing Login and Sign Up buttons...
                 Button(
                     onClick = { navController.navigate("login") },
                     modifier = Modifier
@@ -604,15 +595,17 @@ fun ShellyScreen(
 
 @Composable
 fun SignupScreen(navController: NavHostController) {
+    // Add ViewModel
+    val viewModel: AuthViewModel = viewModel()
+    var authState by remember { mutableStateOf<AuthViewModel.AuthState>(AuthViewModel.AuthState.Idle) }
+
+    // State variables
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var isConfirmPasswordVisible by remember { mutableStateOf(false) }
-    var signupSuccess by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -666,7 +659,7 @@ fun SignupScreen(navController: NavHostController) {
                         value = email,
                         onValueChange = {
                             email = it
-                            errorMessage = null
+                            errorMessage = null // Clear error when user types
                         },
                         label = { Text("Email") },
                         leadingIcon = {
@@ -675,7 +668,7 @@ fun SignupScreen(navController: NavHostController) {
                                 contentDescription = "Email"
                             )
                         },
-                        isError = errorMessage != null,
+                        isError = errorMessage?.contains("email", ignoreCase = true) == true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
@@ -689,7 +682,7 @@ fun SignupScreen(navController: NavHostController) {
                         value = password,
                         onValueChange = {
                             password = it
-                            errorMessage = null
+                            errorMessage = null // Clear error when user types
                         },
                         label = { Text("Password") },
                         leadingIcon = {
@@ -716,7 +709,7 @@ fun SignupScreen(navController: NavHostController) {
                             VisualTransformation.None
                         else
                             PasswordVisualTransformation(),
-                        isError = errorMessage != null,
+                        isError = errorMessage?.contains("password", ignoreCase = true) == true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
@@ -730,7 +723,7 @@ fun SignupScreen(navController: NavHostController) {
                         value = confirmPassword,
                         onValueChange = {
                             confirmPassword = it
-                            errorMessage = null
+                            errorMessage = null // Clear error when user types
                         },
                         label = { Text("Confirm Password") },
                         leadingIcon = {
@@ -757,7 +750,7 @@ fun SignupScreen(navController: NavHostController) {
                             VisualTransformation.None
                         else
                             PasswordVisualTransformation(),
-                        isError = errorMessage != null,
+                        isError = errorMessage?.contains("password", ignoreCase = true) == true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
@@ -766,14 +759,34 @@ fun SignupScreen(navController: NavHostController) {
                         singleLine = true
                     )
 
-                    // Error message
+                    // Error message display
                     if (errorMessage != null) {
-                        Text(
-                            text = errorMessage!!,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = "Error",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = errorMessage!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -791,11 +804,8 @@ fun SignupScreen(navController: NavHostController) {
                             errorMessage = "Passwords do not match"
                         }
                         else -> {
-                            isLoading = true
-                            scope.launch {
-                                delay(1000) // Simulate network delay
-                                isLoading = false
-                                signupSuccess = true
+                            viewModel.signup(email, password) { state ->
+                                authState = state
                             }
                         }
                     }
@@ -803,70 +813,61 @@ fun SignupScreen(navController: NavHostController) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                enabled = !isLoading
+                enabled = authState !is AuthViewModel.AuthState.Loading
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Sign Up")
-                }
-            }
-
-            // Success message and continue button
-            AnimatedVisibility(
-                visible = signupSuccess,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Success",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Text(
-                        text = "Account created successfully!",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Button(
-                        onClick = { navController.navigate("first") },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Continue")
+                when (authState) {
+                    is AuthViewModel.AuthState.Loading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    else -> {
+                        Text("Sign Up")
                     }
                 }
             }
 
             // Already have an account? Login link
-            if (!signupSuccess) {
-                TextButton(
-                    onClick = { navController.navigate("login") }
-                ) {
-                    Text("Already have an account? Login")
+            TextButton(
+                onClick = { navController.navigate("login") }
+            ) {
+                Text("Already have an account? Login")
+            }
+        }
+    }
+
+    // Handle authentication states
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthViewModel.AuthState.Success -> {
+                // Navigate to login screen on successful signup
+                navController.navigate("login") {
+                    // Clear the back stack up to login
+                    popUpTo("login") { inclusive = true }
                 }
             }
+            is AuthViewModel.AuthState.Error -> {
+                errorMessage = (authState as AuthViewModel.AuthState.Error).message
+            }
+            else -> {}
         }
     }
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(navController: NavHostController) {
+    // Add ViewModel
+    val viewModel: AuthViewModel = viewModel()
+    var authState by remember { mutableStateOf<AuthViewModel.AuthState>(AuthViewModel.AuthState.Idle) }
+
+    // State variables
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var loginSuccess by remember { mutableStateOf(false) }
     var isPasswordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -918,7 +919,10 @@ fun LoginScreen(navController: NavHostController) {
                     // Email field
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = {
+                            email = it
+                            errorMessage = null // Clear error when user types
+                        },
                         label = { Text("Email") },
                         leadingIcon = {
                             Icon(
@@ -926,6 +930,7 @@ fun LoginScreen(navController: NavHostController) {
                                 contentDescription = "Email"
                             )
                         },
+                        isError = errorMessage?.contains("email", ignoreCase = true) == true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
@@ -937,7 +942,10 @@ fun LoginScreen(navController: NavHostController) {
                     // Password field
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = {
+                            password = it
+                            errorMessage = null // Clear error when user types
+                        },
                         label = { Text("Password") },
                         leadingIcon = {
                             Icon(
@@ -963,6 +971,7 @@ fun LoginScreen(navController: NavHostController) {
                             VisualTransformation.None
                         else
                             PasswordVisualTransformation(),
+                        isError = errorMessage?.contains("password", ignoreCase = true) == true,
                         modifier = Modifier.fillMaxWidth(),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password,
@@ -971,23 +980,44 @@ fun LoginScreen(navController: NavHostController) {
                         singleLine = true
                     )
 
-                    // Forgot password text
+                    // Forgot password button
                     TextButton(
                         onClick = { /* Handle forgot password */ },
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("Forgot Password?")
                     }
-                }
-            }
 
-            errorMessage?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                    // Error message display
+                    if (errorMessage != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .padding(16.dp)
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Start,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Error,
+                                    contentDescription = "Error",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = errorMessage!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -995,67 +1025,61 @@ fun LoginScreen(navController: NavHostController) {
             // Login button
             Button(
                 onClick = {
-                    isLoading = true
-                    scope.launch {
-                        delay(1000) // Simulate network delay
-                        isLoading = false
-                        if (email == "test@gmail.com" && password == "123") {
-                            loginSuccess = true
-                            errorMessage = null // Clear any previous error message
-                        } else {
-                            loginSuccess = false
-                            errorMessage = "Incorrect email or password. Please try again."
+                    when {
+                        email.isEmpty() || password.isEmpty() -> {
+                            errorMessage = "Please fill in all fields"
+                        }
+                        else -> {
+                            viewModel.login(email, password) { state ->
+                                authState = state
+                            }
                         }
                     }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
-                enabled = email.isNotEmpty() && password.isNotEmpty() && !isLoading
+                enabled = authState !is AuthViewModel.AuthState.Loading
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text("Login")
-                }
-            }
-
-            // Success message and continue button
-            AnimatedVisibility(
-                visible = loginSuccess,
-                enter = fadeIn() + slideInVertically(),
-                exit = fadeOut() + slideOutVertically()
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Success",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Text(
-                        text = "Login successful!",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Button(
-                        onClick = { navController.navigate("home") },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Continue")
+                when (authState) {
+                    is AuthViewModel.AuthState.Loading -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                    else -> {
+                        Text("Login")
                     }
                 }
             }
+
+            // Don't have an account? Sign up link
+            TextButton(
+                onClick = { navController.navigate("signup") }
+            ) {
+                Text("Don't have an account? Sign up")
+            }
+        }
+    }
+
+    // Handle authentication states
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthViewModel.AuthState.Success -> {
+                // Navigate to home screen on successful login
+                navController.navigate("home") {
+                    // Clear the back stack so user can't navigate back to login
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+            is AuthViewModel.AuthState.Error -> {
+                errorMessage = (authState as AuthViewModel.AuthState.Error).message
+            }
+            else -> {}
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(navController: NavHostController) {
@@ -1069,7 +1093,7 @@ fun HomeScreen(navController: NavHostController) {
                 ),
                 actions = {
                     // Settings icon
-                    IconButton(onClick = { /* Handle settings */ }) {
+                    IconButton(onClick = { navController.navigate("settings") }) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = "Settings",
@@ -1553,14 +1577,35 @@ fun LightsScreen(navController: NavHostController) {
             if (selectedLight != null) {
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Light Controls Card
-                LightControlsCard(
-                    isLightOn = isLightOn,
-                    onPowerChange = { isLightOn = it },
-                    brightness = brightness,
-                    onBrightnessChange = { brightness = it },
-                    selectedColor = selectedColor
-                )
+                        ExposedDropdownMenu(
+                            expanded = typeExpanded,
+                            onDismissRequest = { typeExpanded = false }
+                        ) {
+                            deviceTypes.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type) },
+                                    onClick = {
+                                        selectedDeviceType = type
+                                        selectedDeviceName = null
+                                        typeExpanded = false
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            imageVector = when (type) {
+                                                "Camera" -> Icons.Default.Videocam
+                                                "Light" -> Icons.Default.LightMode
+                                                "Plug" -> Icons.Default.Power
+                                                else -> Icons.Default.Sensors
+                                            },
+                                            contentDescription = null
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -2808,6 +2853,9 @@ fun MyNavHost(
         }
         composable("schedule") {
             SchedulePage(navController = navController)
+        }
+        composable("settings") {
+            SettingsScreen(navController = navController)
         }
     }
 }

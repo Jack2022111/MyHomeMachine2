@@ -56,31 +56,38 @@ dependencies {
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
 
-    implementation(libs.material3)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
+    implementation ("androidx.compose.material3:material3:1.2.0")
+    implementation("androidx.compose.material3:material3-window-size-class:1.2.0")
 
-    implementation(libs.material3)
-    implementation(libs.ui)
-    implementation(libs.ui.tooling.preview)
-
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
-
+    implementation("com.squareup.okhttp3:okhttp:4.9.3")
+    implementation("androidx.appcompat:appcompat:1.4.0")
+    implementation("androidx.constraintlayout:constraintlayout:2.1.3")
+    implementation("androidx.appcompat:appcompat:1.7.0-alpha03")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.compose.material3:material3:1.2.0")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("com.google.android.material:material:1.11.0")
+    implementation("androidx.compose.material3:material3:1.2.0")
+    implementation("androidx.compose.material3:material3-window-size-class:1.2.0")
+    implementation("androidx.compose.material:material:1.5.4")
     // For animations
-    implementation(libs.accompanist.navigation.animation)
-
-    implementation(libs.androidx.security.crypto)
+    implementation("com.google.accompanist:accompanist-navigation-animation:0.30.1")
 
     // For extended icons
-    implementation(libs.androidx.material.icons.extended)
+    implementation("androidx.compose.material:material-icons-extended:1.5.4")
     // For custom fonts
-    implementation(libs.androidx.ui.text.google.fonts)
+    implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
     // For coroutines
-    implementation(libs.kotlinx.coroutines.android)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // Add Jetpack Compose Navigation
-    implementation(libs.androidx.navigation.compose)
+    implementation("androidx.navigation:navigation-compose:2.7.2")
 
-    implementation (libs.androidx.lifecycle.viewmodel.ktx)
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1")
+    implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
 
     // Test dependencies
     testImplementation(libs.junit)
