@@ -1,21 +1,21 @@
 package com.example.myhomemachine
 
-import android.Manifest.permission
-import android.app.Application as AndroidApplication
+import android.Manifest
+import android.app.Application
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.TextField
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,13 +33,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
@@ -87,7 +88,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,11 +99,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.animation.*
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -112,14 +107,20 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.myhomemachine.data.DeviceManager
+import com.example.myhomemachine.network.AuthViewModel
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.Call
 import okhttp3.Callback
@@ -127,56 +128,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.*
-import android.util.Log
-import androidx.fragment.app.FragmentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.compose.rememberNavController
-import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
-import android.provider.Settings
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.net.wifi.WifiNetworkSpecifier
-import android.net.ConnectivityManager
-import android.net.NetworkRequest
-import android.os.Build
-import androidx.annotation.RequiresApi
-import android.content.Intent
-import android.net.Network
-import android.net.NetworkCapabilities
-import androidx.compose.foundation.border
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.activity.viewModels
-import androidx.lifecycle.ViewModelProvider
-
 import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.compose.runtime.remember
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.myhomemachine.network.AuthViewModel
-import com.example.myhomemachine.SettingsScreen
 
 
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
@@ -196,6 +148,8 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     }
 }
 
+// We were using Material design components for our theme
+// Better compatability with AppCompatActivity
 class MainActivity : AppCompatActivity() {
     private var isLightOn = false
     private var lastColor: String = "hue:0 saturation:0 brightness:1" // Default color (White)
@@ -234,6 +188,8 @@ class MainActivity : AppCompatActivity() {
         val apiService = RetrofitClient.instance
         val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
 
+        // Coroutine
+        // manage long-running tasks that might block the main thread and cause your app to become unresponsive.
         lifecycleScope.launch {
             try {
                 apiService.setLightState(
@@ -260,7 +216,7 @@ class MainActivity : AppCompatActivity() {
                     authHeader = "Bearer $LIFX_API_TOKEN",
                     body = body
                 )
-                isLightOn = false // ✅ Make sure this updates correctly
+                isLightOn = false
                 Log.d("LIFX", "Light turned OFF")
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
@@ -292,15 +248,21 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Function to convert Jetpack Compose Color to HSB
+    // Function to convert a Color object to an HSB (Hue, Saturation, Brightness) array
     private fun convertColorToHSB(color: Color): FloatArray {
+
+        // Create a FloatArray of size 3 to store HSV (Hue, Saturation, Value) components
         val hsv = FloatArray(3)
+
+        // Convert the Color object's RGB values (which range from 0.0 to 1.0) to integer values (0-255)
         android.graphics.Color.RGBToHSV(
-            (color.red * 255).toInt(),
-            (color.green * 255).toInt(),
-            (color.blue * 255).toInt(),
-            hsv
+            (color.red * 255).toInt(),   // Convert red component to 0-255 range
+            (color.green * 255).toInt(), // Convert green component to 0-255 range
+            (color.blue * 255).toInt(),  // Convert blue component to 0-255 range
+            hsv                          // Store the converted HSV values in the 'hsv' array
         )
+
+        // Return the HSV array containing hue, saturation, and brightness values
         return hsv
     }
 
