@@ -100,7 +100,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.animation.*
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -177,7 +176,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.myhomemachine.network.AuthViewModel
 import com.example.myhomemachine.SettingsScreen
+import androidx.navigation.navArgument
+import androidx.navigation.NavType
+import com.example.myhomemachine.ForgotPasswordScreen
 
+import androidx.navigation.navArgument
+import androidx.compose.foundation.text.KeyboardOptions
+import com.example.myhomemachine.VerificationType
+import com.example.myhomemachine.CodeVerificationScreen
+import com.example.myhomemachine.ResetPasswordConfirmScreen
 
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
 private const val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
@@ -607,6 +614,9 @@ fun SignupScreen(navController: NavHostController) {
     var isConfirmPasswordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    // State to track if verification info should be shown
+    var showVerificationInfo by remember { mutableStateOf(false) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -759,8 +769,62 @@ fun SignupScreen(navController: NavHostController) {
                         singleLine = true
                     )
 
+                    // Verification Info Card (shows only after successful signup)
+                    AnimatedVisibility(
+                        visible = showVerificationInfo,
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut()
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = "Success",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(32.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Text(
+                                    text = "Account Created Successfully!",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = "A verification code has been sent to your email.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                Button(
+                                    onClick = {
+                                        navController.navigate("verify-email/${email}")
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Enter Verification Code")
+                                }
+                            }
+                        }
+                    }
+
                     // Error message display
-                    if (errorMessage != null) {
+                    if (errorMessage != null && !showVerificationInfo) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(
@@ -794,45 +858,47 @@ fun SignupScreen(navController: NavHostController) {
             Spacer(modifier = Modifier.height(32.dp))
 
             // Sign Up button
-            Button(
-                onClick = {
-                    when {
-                        email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty() -> {
-                            errorMessage = "Please fill in all fields"
-                        }
-                        password != confirmPassword -> {
-                            errorMessage = "Passwords do not match"
-                        }
-                        else -> {
-                            viewModel.signup(email, password) { state ->
-                                authState = state
+            if (!showVerificationInfo) {
+                Button(
+                    onClick = {
+                        when {
+                            email.isEmpty() || password.isEmpty() || confirmPassword.isEmpty() -> {
+                                errorMessage = "Please fill in all fields"
+                            }
+                            password != confirmPassword -> {
+                                errorMessage = "Passwords do not match"
+                            }
+                            else -> {
+                                viewModel.signup(email, password) { state ->
+                                    authState = state
+                                }
                             }
                         }
-                    }
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                enabled = authState !is AuthViewModel.AuthState.Loading
-            ) {
-                when (authState) {
-                    is AuthViewModel.AuthState.Loading -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                    else -> {
-                        Text("Sign Up")
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    enabled = authState !is AuthViewModel.AuthState.Loading
+                ) {
+                    when (authState) {
+                        is AuthViewModel.AuthState.Loading -> {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                        else -> {
+                            Text("Sign Up")
+                        }
                     }
                 }
-            }
 
-            // Already have an account? Login link
-            TextButton(
-                onClick = { navController.navigate("login") }
-            ) {
-                Text("Already have an account? Login")
+                // Already have an account? Login link
+                TextButton(
+                    onClick = { navController.navigate("login") }
+                ) {
+                    Text("Already have an account? Login")
+                }
             }
         }
     }
@@ -841,20 +907,18 @@ fun SignupScreen(navController: NavHostController) {
     LaunchedEffect(authState) {
         when (authState) {
             is AuthViewModel.AuthState.Success -> {
-                // Navigate to login screen on successful signup
-                navController.navigate("login") {
-                    // Clear the back stack up to login
-                    popUpTo("login") { inclusive = true }
-                }
+                // Show verification info and options
+                errorMessage = null
+                showVerificationInfo = true
             }
             is AuthViewModel.AuthState.Error -> {
                 errorMessage = (authState as AuthViewModel.AuthState.Error).message
+                showVerificationInfo = false
             }
             else -> {}
         }
     }
 }
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -982,7 +1046,7 @@ fun LoginScreen(navController: NavHostController) {
 
                     // Forgot password button
                     TextButton(
-                        onClick = { /* Handle forgot password */ },
+                        onClick = { navController.navigate("forgot-password") },
                         modifier = Modifier.align(Alignment.End)
                     ) {
                         Text("Forgot Password?")
@@ -1069,12 +1133,20 @@ fun LoginScreen(navController: NavHostController) {
             is AuthViewModel.AuthState.Success -> {
                 // Navigate to home screen on successful login
                 navController.navigate("home") {
-                    // Clear the back stack so user can't navigate back to login
                     popUpTo(0) { inclusive = true }
                 }
             }
             is AuthViewModel.AuthState.Error -> {
                 errorMessage = (authState as AuthViewModel.AuthState.Error).message
+            }
+            is AuthViewModel.AuthState.PasswordResetRequested -> {
+                errorMessage = (authState as AuthViewModel.AuthState.PasswordResetRequested).message
+            }
+            is AuthViewModel.AuthState.PasswordResetSuccess -> {
+                errorMessage = (authState as AuthViewModel.AuthState.PasswordResetSuccess).message
+                delay(2000) // Show success message briefly
+                // Clear error message
+                errorMessage = null
             }
             else -> {}
         }
@@ -2822,6 +2894,82 @@ fun MyNavHost(
         composable("signup") {
             SignupScreen(navController)
         }
+
+        // Email verification with code
+        composable(
+            route = "verify-email/{email}",
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            CodeVerificationScreen(
+                navController = navController,
+                email = email,
+                verificationType = VerificationType.EMAIL_VERIFICATION
+            )
+        }
+
+        // Password reset routes
+        composable("forgot-password") {
+            ForgotPasswordScreen(navController)
+        }
+
+        composable(
+            route = "reset-password-verify/{email}",
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            CodeVerificationScreen(
+                navController = navController,
+                email = email,
+                verificationType = VerificationType.PASSWORD_RESET
+            )
+        }
+
+        composable(
+            route = "reset-password-confirm/{email}/{code}",
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                },
+                navArgument("code") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            val code = backStackEntry.arguments?.getString("code") ?: ""
+            ResetPasswordConfirmScreen(
+                navController = navController,
+                email = email,
+                verificationCode = code
+            )
+        }
+
+        // Account deletion route
+        composable(
+            route = "delete-account/{email}",
+            arguments = listOf(
+                navArgument("email") {
+                    type = NavType.StringType
+                }
+            )
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email") ?: ""
+            CodeVerificationScreen(
+                navController = navController,
+                email = email,
+                verificationType = VerificationType.ACCOUNT_DELETION
+            )
+        }
+
         composable("home") {
             HomeScreen(navController = navController)
         }
@@ -2840,10 +2988,9 @@ fun MyNavHost(
                 onSetColor = onSetColor
             )
         }
-
         composable("plugs") {
-            val deviceController = DeviceController()  // Create an instance of DeviceController
-            PlugsScreen(navController = navController, deviceController = deviceController)  // Pass it to PlugsScreen
+            val deviceController = DeviceController()
+            PlugsScreen(navController = navController, deviceController = deviceController)
         }
         composable("cameras") {
             CamerasScreen(navController = navController)

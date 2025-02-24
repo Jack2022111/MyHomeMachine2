@@ -1,6 +1,6 @@
 # MyHomeMachine Backend
 
-## Project Structure
+## Project Structure YOU NEED ".env"
 ```
 myhomemachine-backend/
 ├── app.py
@@ -15,6 +15,10 @@ The virtual environment has already been created. You just need to activate it.
 If not, delete venv file and run this command:
 ```
  python -m venv venv
+```
+#### On Mac:
+```
+source venv/bin/activate
 ```
 
 #### On Windows:

@@ -55,7 +55,10 @@ dependencies {
 
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
-
+    implementation ("androidx.compose.ui:ui:<latest_version>")
+    implementation ("androidx.compose.material3:material3:<latest_version>")
+    implementation ("androidx.activity:activity-compose:1.8.0")
+    implementation ("androidx.compose.material3:material3")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
     implementation ("androidx.compose.material3:material3:1.2.0")
