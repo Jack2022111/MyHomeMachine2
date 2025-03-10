@@ -247,7 +247,7 @@ class MainActivity : AppCompatActivity() {
                     authHeader = "Bearer $LIFX_API_TOKEN",
                     body = body
                 )
-                isLightOn = false // ✅ Make sure this updates correctly
+                isLightOn = false
                 Log.d("LIFX", "Light turned OFF")
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
@@ -501,6 +501,7 @@ fun GeofenceLogsScreen(
         }
     }
 }
+
 
 
 
