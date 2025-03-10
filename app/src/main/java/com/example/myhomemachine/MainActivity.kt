@@ -1,21 +1,29 @@
 package com.example.myhomemachine
 
-import android.Manifest.permission
-import android.app.Application as AndroidApplication
+import android.Manifest
+import android.app.Application
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.TextField
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +41,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
@@ -40,6 +49,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
@@ -87,7 +98,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,10 +109,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.animation.*
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -111,13 +117,27 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.myhomemachine.data.DeviceManager
+import com.example.myhomemachine.network.AuthViewModel
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
+import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofencingClient
+import com.google.android.gms.location.GeofencingEvent
+import com.google.android.gms.location.GeofencingRequest
+import com.google.android.gms.location.LocationServices
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import okhttp3.Call
@@ -126,65 +146,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import java.io.IOException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.*
-import android.util.Log
-import androidx.fragment.app.FragmentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.compose.rememberNavController
-import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
-import android.provider.Settings
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.net.wifi.WifiNetworkSpecifier
-import android.net.ConnectivityManager
-import android.net.NetworkRequest
-import android.os.Build
-import androidx.annotation.RequiresApi
-import android.content.Intent
-import android.net.Network
-import android.net.NetworkCapabilities
-import androidx.compose.foundation.border
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.activity.viewModels
-import androidx.lifecycle.ViewModelProvider
-
 import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.compose.runtime.remember
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.myhomemachine.network.AuthViewModel
-import com.example.myhomemachine.SettingsScreen
-import androidx.navigation.navArgument
-import androidx.navigation.NavType
-import com.example.myhomemachine.ForgotPasswordScreen
-
-import androidx.navigation.navArgument
-import androidx.compose.foundation.text.KeyboardOptions
-import com.example.myhomemachine.VerificationType
-import com.example.myhomemachine.CodeVerificationScreen
-import com.example.myhomemachine.ResetPasswordConfirmScreen
 
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
 private const val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
@@ -207,12 +169,12 @@ class MainActivity : AppCompatActivity() {
     private var isLightOn = false
     private var lastColor: String = "hue:0 saturation:0 brightness:1" // Default color (White)
     private var currentBrightness: Float = 0.8f // Default brightness (80%)
-
+    private lateinit var geofencingClient: GeofencingClient
 
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        geofencingClient = LocationServices.getGeofencingClient(this)
         checkAndRequestPermissions()
 
         val sharedViewModel: SharedViewModel by viewModels()
@@ -230,7 +192,8 @@ class MainActivity : AppCompatActivity() {
                         onTurnLightOff = { turnLightOff() },
                         onBrightnessChange = { brightness -> setBrightness(brightness) },
                         setBrightness = { brightness -> this.setBrightness(brightness) },
-                        onSetColor = { color -> setColor(color) }
+                        onSetColor = { color -> setColor(color) },
+                        onSetGeofence = { setGeofenceAtCurrentLocation() }  // Pass the lambda here
                     )
                 }
             }
@@ -333,10 +296,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAndRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        val permissionsNeeded = mutableListOf<String>()
+
+        // Check for foreground location permission
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+
+        // Check for background location permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            != PackageManager.PERMISSION_GRANTED) {
+            permissionsNeeded.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+
+        if (permissionsNeeded.isNotEmpty()) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                permissionsNeeded.toTypedArray(),
                 LOCATION_PERMISSION_REQUEST_CODE
             )
         }
@@ -344,6 +322,93 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
+    }
+
+    private fun createGeofence(latitude: Double, longitude: Double, radius: Float): Geofence {
+        return Geofence.Builder()
+            .setRequestId("HOME_GEOFENCE")
+            .setCircularRegion(latitude, longitude, radius)
+            .setExpirationDuration(Geofence.NEVER_EXPIRE)
+            .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT)
+            .build()
+    }
+
+    private fun createGeofencingRequest(geofence: Geofence): GeofencingRequest {
+        return GeofencingRequest.Builder()
+            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
+            .addGeofence(geofence)
+            .build()
+    }
+
+    private fun addGeofence(latitude: Double, longitude: Double, radius: Float) {
+        val geofence = createGeofence(latitude, longitude, radius)
+        val geofencingRequest = createGeofencingRequest(geofence)
+
+        // Use a PendingIntent pointing to your BroadcastReceiver
+        val geofencePendingIntent: PendingIntent by lazy {
+            val intent = Intent(this, GeofenceBroadcastReceiver::class.java)
+            PendingIntent.getBroadcast(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            geofencingClient.addGeofences(geofencingRequest, geofencePendingIntent)
+                .addOnSuccessListener {
+                    Log.d("Geofence", "Geofence added successfully at: ($latitude, $longitude)")
+                }
+                .addOnFailureListener { e ->
+                    Log.e("Geofence", "Failed to add geofence: ${e.message}")
+                }
+        }
+    }
+
+    private fun setGeofenceAtCurrentLocation(radius: Float = 10f) {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        // Make sure location permissions are granted before calling this.
+        if (ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location ->
+                    if (location != null) {
+                        // Call your existing addGeofence() function with the current coordinates.
+                        addGeofence(location.latitude, location.longitude, radius)
+                    } else {
+                        Log.e("Geofence", "Current location is null. Ensure location is enabled on your device.")
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e("Geofence", "Failed to get current location: ${e.message}")
+                }
+            return
+        }
+    }
+}
+
+class GeofenceBroadcastReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val geofencingEvent = GeofencingEvent.fromIntent(intent)
+        if (geofencingEvent != null) {
+            if (geofencingEvent.hasError()) {
+                Log.e("Geofence", "Error receiving geofence event")
+                return
+            }
+        }
+        if (geofencingEvent != null) {
+            when (geofencingEvent.geofenceTransition) {
+                Geofence.GEOFENCE_TRANSITION_ENTER -> Log.d("Geofence", "Entered geofence")
+                Geofence.GEOFENCE_TRANSITION_EXIT -> Log.d("Geofence", "Exited geofence")
+            }
+        }
     }
 }
 
@@ -387,7 +452,10 @@ class DeviceController {
 }
 
 @Composable
-fun FirstScreen(navController: NavHostController) {
+fun FirstScreen(
+    navController: NavHostController,
+    onSetGeofence: () -> Unit  // Lambda parameter for setting the geofence
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -434,7 +502,7 @@ fun FirstScreen(navController: NavHostController) {
                 )
             }
 
-            // Bottom section with Sign-in/login buttons
+            // Bottom section with buttons
             Column(
                 modifier = Modifier
                     .padding(bottom = 32.dp)
@@ -492,6 +560,43 @@ fun FirstScreen(navController: NavHostController) {
                         text = "Sign Up",
                         style = MaterialTheme.typography.titleMedium
                     )
+                }
+
+                // Additional button to navigate directly to HomeScreen
+                Button(
+                    onClick = { navController.navigate("home") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .animateContentSize(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.tertiary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Continue as Guest",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                // Button to set the geofence
+                Button(
+                    onClick = onSetGeofence,  // Use the lambda provided by the Activity
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(text = "Set Geofence")
                 }
             }
         }
@@ -1599,232 +1704,6 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
     }
 }
 
-
-//working lightscreen 2.0
-/*
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LightsScreen(navController: NavHostController) {
-    val knownLights = DeviceManager.knownLights
-    var selectedLight by remember { mutableStateOf<String?>(null) }
-    var isLightOn by remember { mutableStateOf(false) }
-    var selectedColor by remember { mutableStateOf(Color.White) }
-    var brightness by remember { mutableStateOf(0.8f) }
-    var showScheduleDialog by remember { mutableStateOf(false) }
-    var showConfirmation by remember { mutableStateOf(false) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Lights Control") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Light Selection Card
-            LightSelectionCard(
-                knownLights = knownLights,
-                selectedLight = selectedLight,
-                onLightSelected = { selectedLight = it }
-            )
-
-            if (selectedLight != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                        ExposedDropdownMenu(
-                            expanded = typeExpanded,
-                            onDismissRequest = { typeExpanded = false }
-                        ) {
-                            deviceTypes.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type) },
-                                    onClick = {
-                                        selectedDeviceType = type
-                                        selectedDeviceName = null
-                                        typeExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = when (type) {
-                                                "Camera" -> Icons.Default.Videocam
-                                                "Light" -> Icons.Default.LightMode
-                                                "Plug" -> Icons.Default.Power
-                                                else -> Icons.Default.Sensors
-                                            },
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Color Selection Card
-                ColorSelectionCard(
-                    selectedColor = selectedColor,
-                    onColorSelected = { selectedColor = it }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Schedule and Save Buttons
-                ActionButtons(
-                    onScheduleClick = { showScheduleDialog = true },
-                    onSaveClick = { showConfirmation = true }
-                )
-            }
-        }
-    }
-
-    // Schedule Dialog
-    if (showScheduleDialog) {
-        EnhancedScheduleDialog(onDismiss = { showScheduleDialog = false })
-    }
-
-    // Confirmation Dialog
-    if (showConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showConfirmation = false },
-            title = { Text("Success") },
-            text = { Text("Light settings have been saved successfully.") },
-            confirmButton = {
-                Button(onClick = {
-                    showConfirmation = false
-                    navController.navigateUp()
-                }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-}
-
-*/
-
-//working lightscreen2.1
-/*
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LightsScreen(
-    navController: NavHostController,
-    onTurnLightOn: () -> Unit,   // Accept functions
-    onTurnLightOff: () -> Unit   // Accept functions
-) {
-    val knownLights = DeviceManager.knownLights
-    var selectedLight by remember { mutableStateOf<String?>(null) }
-    var isLightOn by remember { mutableStateOf(false) }
-    var selectedColor by remember { mutableStateOf(Color.White) }
-    var brightness by remember { mutableStateOf(0.8f) }
-    var showScheduleDialog by remember { mutableStateOf(false) }
-    var showConfirmation by remember { mutableStateOf(false) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Lights Control") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            LightSelectionCard(
-                knownLights = knownLights,
-                selectedLight = selectedLight,
-                onLightSelected = { selectedLight = it }
-            )
-
-            if (selectedLight != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                LightControlsCard(
-                    isLightOn = isLightOn,
-                    onPowerChange = {
-                        if (isLightOn) {
-                            onTurnLightOff()
-                        } else {
-                            onTurnLightOn()
-                        }
-                        isLightOn = !isLightOn
-                    },
-                    brightness = brightness,
-                    onBrightnessChange = { brightness = it },
-                    selectedColor = selectedColor
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                ColorSelectionCard(
-                    selectedColor = selectedColor,
-                    onColorSelected = { selectedColor = it }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                ActionButtons(
-                    onScheduleClick = { showScheduleDialog = true },
-                    onSaveClick = { showConfirmation = true }
-                )
-            }
-        }
-    }
-
-    if (showScheduleDialog) {
-        EnhancedScheduleDialog(onDismiss = { showScheduleDialog = false })
-    }
-
-    if (showConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showConfirmation = false },
-            title = { Text("Success") },
-            text = { Text("Light settings have been saved successfully.") },
-            confirmButton = {
-                Button(onClick = {
-                    showConfirmation = false
-                    navController.navigateUp()
-                }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-}
-
- */
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LightsScreen(
@@ -2869,7 +2748,8 @@ fun MyNavHost(
     onTurnLightOff: () -> Unit,
     onBrightnessChange: (Float) -> Unit,
     setBrightness: (Float) -> Unit,
-    onSetColor: (Color) -> Unit
+    onSetColor: (Color) -> Unit,
+    onSetGeofence: () -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -2885,7 +2765,8 @@ fun MyNavHost(
         }
         composable("first") {
             FirstScreen(
-                navController = navController
+                navController = navController,
+                onSetGeofence = { onSetGeofence() }
             )
         }
         composable("login") {
