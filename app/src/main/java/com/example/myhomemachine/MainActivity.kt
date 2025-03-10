@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
@@ -392,17 +393,19 @@ class MainActivity : AppCompatActivity() {
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val geofencingEvent = GeofencingEvent.fromIntent(intent)
-        if (geofencingEvent != null) {
-            if (geofencingEvent.hasError()) {
-                Log.e("Geofence", "Error receiving geofence event")
-                return
-            }
-        }
-        if (geofencingEvent != null) {
+        if (geofencingEvent != null && !geofencingEvent.hasError()) {
             when (geofencingEvent.geofenceTransition) {
-                Geofence.GEOFENCE_TRANSITION_ENTER -> Log.d("Geofence", "Entered geofence")
-                Geofence.GEOFENCE_TRANSITION_EXIT -> Log.d("Geofence", "Exited geofence")
+                Geofence.GEOFENCE_TRANSITION_ENTER -> {
+                    Log.d("Geofence", "Entered geofence")
+                    Toast.makeText(context, "Entered geofence", Toast.LENGTH_SHORT).show()
+                }
+                Geofence.GEOFENCE_TRANSITION_EXIT -> {
+                    Log.d("Geofence", "Exited geofence")
+                    Toast.makeText(context, "Exited geofence", Toast.LENGTH_SHORT).show()
+                }
             }
+        } else {
+            Log.e("Geofence", "Error receiving geofence event")
         }
     }
 }
