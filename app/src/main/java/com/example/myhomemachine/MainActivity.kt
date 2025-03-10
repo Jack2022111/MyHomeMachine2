@@ -167,11 +167,13 @@ class SharedViewModel(application: Application) : AndroidViewModel(application) 
     }
 }
 
+
 class MainActivity : AppCompatActivity() {
     private var isLightOn = false
     private var lastColor: String = "hue:0 saturation:0 brightness:1" // Default color (White)
     private var currentBrightness: Float = 0.8f // Default brightness (80%)
     private lateinit var geofencingClient: GeofencingClient
+    private val logs = mutableStateListOf<String>() // Store logs for UI
 
     @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @RequiresApi(Build.VERSION_CODES.M)
@@ -187,7 +189,9 @@ class MainActivity : AppCompatActivity() {
         val geofenceReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 val message = intent?.getStringExtra("message") ?: "No message"
-                sharedViewModel.logs.add(message)
+                logs.add(message) // ✅ Update local logs list
+                sharedViewModel.logs.add(message) // ✅ Also update ViewModel logs
+                Log.d("Geofence", message)
             }
         }
         registerReceiver(geofenceReceiver, IntentFilter("com.example.myhomemachine.GEOFENCE_EVENT"))
@@ -200,6 +204,7 @@ class MainActivity : AppCompatActivity() {
                         navController = navController,
                         modifier = Modifier.padding(innerPadding),
                         sharedViewModel = sharedViewModel,
+                        logs = logs, // ✅ Pass logs correctly
                         onTurnLightOn = { turnLightOn() },
                         onTurnLightOff = { turnLightOff() },
                         onBrightnessChange = { brightness -> setBrightness(brightness) },
@@ -332,10 +337,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    companion object {
-        private const val LOCATION_PERMISSION_REQUEST_CODE = 1
-    }
-
     private fun createGeofence(latitude: Double, longitude: Double, radius: Float): Geofence {
         return Geofence.Builder()
             .setRequestId("HOME_GEOFENCE")
@@ -378,6 +379,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /*
     private fun setGeofenceAtCurrentLocation(radius: Float = 10f) {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         // Check if location permission is NOT granted, then return early.
@@ -399,12 +401,39 @@ class MainActivity : AppCompatActivity() {
                 Log.e("Geofence", "Failed to get current location: ${e.message}")
             }
     }
+
+     */
+    private fun setGeofenceAtCurrentLocation(radius: Float = 10f) {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.e("Geofence", "Location permission not granted.")
+            return
+        }
+
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location ->
+                if (location != null) {
+                    addGeofence(location.latitude, location.longitude, radius)
+                } else {
+                    Log.e("Geofence", "Current location is null. Ensure location is enabled on your device.")
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("Geofence", "Failed to get current location: ${e.message}")
+            }
+    }
+
+    companion object {
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GeofenceLogsScreen(
-    logs: List<String>,
+    logs: MutableList<String>,  // ✅ Now this directly receives updates
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -426,20 +455,54 @@ fun GeofenceLogsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            if (logs.isEmpty()) {
-                Text("No logs available", style = MaterialTheme.typography.bodyMedium)
-            } else {
-                logs.forEach { log ->
-                    Text(
-                        text = log,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(vertical = 4.dp)
+            Text(
+                text = "Geofence Logs",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Column(
+                modifier = Modifier
+                    .height(200.dp)
+                    .fillMaxWidth()
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        shape = MaterialTheme.shapes.medium
                     )
+                    .padding(8.dp)
+                    .verticalScroll(rememberScrollState()) // Make logs scrollable
+            ) {
+                if (logs.isEmpty()) {
+                    Text("No logs available", style = MaterialTheme.typography.bodyMedium)
+                } else {
+                    logs.forEach { log ->
+                        Text(
+                            text = log,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                    }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ✅ Clear Logs Button
+            Button(
+                onClick = { logs.clear() }, // ✅ This will now clear logs properly
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text(text = "Clear Logs")
             }
         }
     }
 }
+
+
 
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -450,8 +513,10 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
                 Geofence.GEOFENCE_TRANSITION_EXIT -> "Exited geofence"
                 else -> "Unknown geofence event"
             }
+
             Log.d("Geofence", message)
-            // Broadcast the event so that the UI can update
+
+            // Broadcast the event so that the UI can update the logs
             val broadcastIntent = Intent("com.example.myhomemachine.GEOFENCE_EVENT")
             broadcastIntent.putExtra("message", message)
             context.sendBroadcast(broadcastIntent)
@@ -460,6 +525,7 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
         }
     }
 }
+
 
 // DeviceController class to manage the Shelly Plug
 class DeviceController {
@@ -2793,6 +2859,7 @@ fun MyNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
     sharedViewModel: SharedViewModel,
+    logs: MutableList<String>,  // ✅ Pass logs here
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit,
     onBrightnessChange: (Float) -> Unit,
@@ -2824,10 +2891,7 @@ fun MyNavHost(
             )
         }
         composable("geofence_logs") {
-            GeofenceLogsScreen(
-                logs = sharedViewModel.logs,
-                onBack = { navController.popBackStack() }
-            )
+            GeofenceLogsScreen(logs = logs, onBack = { navController.popBackStack() }) // ✅ Logs update dynamically
         }
         composable("login") {
             LoginScreen(navController)
