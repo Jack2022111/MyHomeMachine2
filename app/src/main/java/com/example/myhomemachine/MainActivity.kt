@@ -1,18 +1,19 @@
 package com.example.myhomemachine
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Application
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
@@ -172,6 +173,7 @@ class MainActivity : AppCompatActivity() {
     private var currentBrightness: Float = 0.8f // Default brightness (80%)
     private lateinit var geofencingClient: GeofencingClient
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -180,6 +182,15 @@ class MainActivity : AppCompatActivity() {
 
         val sharedViewModel: SharedViewModel by viewModels()
         sharedViewModel.initialize(this)
+
+        // Register a receiver to capture geofence events and update UI logs.
+        val geofenceReceiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val message = intent?.getStringExtra("message") ?: "No message"
+                sharedViewModel.logs.add(message)
+            }
+        }
+        registerReceiver(geofenceReceiver, IntentFilter("com.example.myhomemachine.GEOFENCE_EVENT"))
 
         setContent {
             MyHomeMachineTheme {
@@ -390,20 +401,36 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+@Composable
+fun GeofenceLogView(logs: List<String>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .verticalScroll(rememberScrollState())
+            .border(1.dp, Color.Gray)
+            .padding(8.dp)
+    ) {
+        logs.forEach { log ->
+            Text(text = log, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
 class GeofenceBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val geofencingEvent = GeofencingEvent.fromIntent(intent)
         if (geofencingEvent != null && !geofencingEvent.hasError()) {
-            when (geofencingEvent.geofenceTransition) {
-                Geofence.GEOFENCE_TRANSITION_ENTER -> {
-                    Log.d("Geofence", "Entered geofence")
-                    Toast.makeText(context, "Entered geofence", Toast.LENGTH_SHORT).show()
-                }
-                Geofence.GEOFENCE_TRANSITION_EXIT -> {
-                    Log.d("Geofence", "Exited geofence")
-                    Toast.makeText(context, "Exited geofence", Toast.LENGTH_SHORT).show()
-                }
+            val message = when (geofencingEvent.geofenceTransition) {
+                Geofence.GEOFENCE_TRANSITION_ENTER -> "Entered geofence"
+                Geofence.GEOFENCE_TRANSITION_EXIT -> "Exited geofence"
+                else -> "Unknown geofence event"
             }
+            Log.d("Geofence", message)
+            // Broadcast the event so that the UI can update
+            val broadcastIntent = Intent("com.example.myhomemachine.GEOFENCE_EVENT")
+            broadcastIntent.putExtra("message", message)
+            context.sendBroadcast(broadcastIntent)
         } else {
             Log.e("Geofence", "Error receiving geofence event")
         }
@@ -452,7 +479,8 @@ class DeviceController {
 @Composable
 fun FirstScreen(
     navController: NavHostController,
-    onSetGeofence: () -> Unit  // Lambda parameter for setting the geofence
+    onSetGeofence: () -> Unit,
+    logs: List<String>
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -599,6 +627,7 @@ fun FirstScreen(
             }
         }
     }
+    GeofenceLogView(logs = logs)
 }
 
 @RequiresApi(Build.VERSION_CODES.M)
@@ -2764,7 +2793,8 @@ fun MyNavHost(
         composable("first") {
             FirstScreen(
                 navController = navController,
-                onSetGeofence = { onSetGeofence() }
+                onSetGeofence = { onSetGeofence() },
+                logs = sharedViewModel.logs
             )
         }
         composable("login") {
