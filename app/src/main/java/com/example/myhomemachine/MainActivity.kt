@@ -401,18 +401,42 @@ class MainActivity : AppCompatActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun GeofenceLogView(logs: List<String>) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(150.dp)
-            .verticalScroll(rememberScrollState())
-            .border(1.dp, Color.Gray)
-            .padding(8.dp)
-    ) {
-        logs.forEach { log ->
-            Text(text = log, style = MaterialTheme.typography.bodySmall)
+fun GeofenceLogsScreen(
+    logs: List<String>,
+    onBack: () -> Unit
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Geofence Logs") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            if (logs.isEmpty()) {
+                Text("No logs available", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                logs.forEach { log ->
+                    Text(
+                        text = log,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -588,7 +612,6 @@ fun FirstScreen(
                     )
                 }
 
-                // Additional button to navigate directly to HomeScreen
                 Button(
                     onClick = { navController.navigate("home") },
                     modifier = Modifier
@@ -615,9 +638,9 @@ fun FirstScreen(
                     )
                 }
 
-                // Button to set the geofence
+                // Button to set the geofence and navigate to the logs screen
                 Button(
-                    onClick = onSetGeofence,  // Use the lambda provided by the Activity
+                    onClick = onSetGeofence,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp)
@@ -627,7 +650,6 @@ fun FirstScreen(
             }
         }
     }
-    GeofenceLogView(logs = logs)
 }
 
 @RequiresApi(Build.VERSION_CODES.M)
@@ -2793,8 +2815,18 @@ fun MyNavHost(
         composable("first") {
             FirstScreen(
                 navController = navController,
-                onSetGeofence = { onSetGeofence() },
+                // When clicking "Set Geofence", call setGeofenceAtCurrentLocation() and then navigate to logs screen.
+                onSetGeofence = {
+                    onSetGeofence()
+                    navController.navigate("geofence_logs")
+                },
                 logs = sharedViewModel.logs
+            )
+        }
+        composable("geofence_logs") {
+            GeofenceLogsScreen(
+                logs = sharedViewModel.logs,
+                onBack = { navController.popBackStack() }
             )
         }
         composable("login") {
