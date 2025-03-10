@@ -368,29 +368,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun setGeofenceAtCurrentLocation(radius: Float = 10f) {
         val fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        // Make sure location permissions are granted before calling this.
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            fusedLocationClient.lastLocation
-                .addOnSuccessListener { location ->
-                    if (location != null) {
-                        // Call your existing addGeofence() function with the current coordinates.
-                        addGeofence(location.latitude, location.longitude, radius)
-                    } else {
-                        Log.e("Geofence", "Current location is null. Ensure location is enabled on your device.")
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Log.e("Geofence", "Failed to get current location: ${e.message}")
-                }
+        // Check if location permission is NOT granted, then return early.
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.e("Geofence", "Location permission not granted.")
             return
         }
+        // If permissions are granted, proceed to get the location.
+        fusedLocationClient.lastLocation
+            .addOnSuccessListener { location ->
+                if (location != null) {
+                    addGeofence(location.latitude, location.longitude, radius)
+                } else {
+                    Log.e("Geofence", "Current location is null. Ensure location is enabled on your device.")
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e("Geofence", "Failed to get current location: ${e.message}")
+            }
     }
 }
 
