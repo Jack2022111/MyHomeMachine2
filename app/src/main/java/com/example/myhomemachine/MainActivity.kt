@@ -202,8 +202,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.nativeCanvas
-
-
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import androidx.core.app.NotificationCompat
 
 
 // lifx stuff super unsecure
@@ -457,10 +458,23 @@ class MainActivity : AppCompatActivity() {
                 LOCATION_PERMISSION_REQUEST_CODE
             )
         }
+        // Check for notification permission on Android 13 (Tiramisu) and higher.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+        }
     }
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
+        private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 2
     }
 }
 
@@ -888,10 +902,205 @@ fun FirstScreen(navController: NavHostController) {
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
+
+                Button(
+                    onClick = { navController.navigate("wififence") }, // to cracked version of geofence
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .animateContentSize(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Geofence test",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
             }
         }
     }
 }
+
+@RequiresApi(Build.VERSION_CODES.M)
+@Composable
+fun WifiMonitorScreen(navController: NavHostController) {
+    val context = LocalContext.current
+    var connectionStatus by remember { mutableStateOf("Not connected to androidwifi") }
+    // Flag to prevent sending repeated notifications
+    var notificationSent by remember { mutableStateOf(false) }
+
+    // Helper function to send a notification.
+    fun sendNotification(message: String) {
+        val channelId = "wifi_notification_channel"
+        val notificationManager = context.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        // Create notification channel for Android O and above.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(channelId, "WiFi Notifications", NotificationManager.IMPORTANCE_DEFAULT)
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val notificationBuilder = NotificationCompat.Builder(context.applicationContext, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Replace with actual icon
+            .setContentTitle("WiFi Connection Update")
+            .setContentText(message)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+
+        notificationManager.notify(1, notificationBuilder.build())
+    }
+
+    // Periodically check the Wi‑Fi connection status.
+    LaunchedEffect(Unit) {
+        while (true) {
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager?
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+            val activeNetwork = connectivityManager?.activeNetworkInfo
+
+            if (activeNetwork != null &&
+                activeNetwork.isConnected &&
+                activeNetwork.type == ConnectivityManager.TYPE_WIFI) {
+                val wifiInfo = wifiManager?.connectionInfo
+                // Remove any surrounding quotes (some devices return quoted SSIDs)
+                val currentSSID = wifiInfo?.ssid?.replace("\"", "")
+                if (currentSSID.equals("androidwifi", ignoreCase = true)) {
+                    connectionStatus = "Connected to $currentSSID"
+                    if (!notificationSent) {
+                        sendNotification("Connected to androidwifi")
+                        notificationSent = true
+                    }
+                } else {
+                    connectionStatus = "Not connected to androidwifi"
+                    notificationSent = false
+                }
+            } else {
+                connectionStatus = "Not connected to androidwifi"
+                notificationSent = false
+            }
+            delay(5000L) // Check every 5 seconds.
+        }
+    }
+
+    // UI layout
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Display the current connection status.
+            Text(
+                text = connectionStatus,
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Button to navigate back home.
+            Button(
+                onClick = { navController.navigate("home") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(text = "Go to Home")
+            }
+        }
+    }
+}
+
+
+/*
+// works
+@RequiresApi(Build.VERSION_CODES.M)
+@Composable
+fun WifiMonitorScreen(navController: NavHostController) {
+    val context = LocalContext.current
+    var connectionStatus by remember { mutableStateOf("Not connected to androidwifi") }
+
+    // Periodically check the Wi‑Fi connection status
+    LaunchedEffect(Unit) {
+        while (true) {
+            // Get WifiManager and ConnectivityManager
+            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager?
+            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
+            val activeNetwork = connectivityManager?.activeNetworkInfo
+
+            if (activeNetwork != null &&
+                activeNetwork.isConnected &&
+                activeNetwork.type == ConnectivityManager.TYPE_WIFI) {
+                val wifiInfo = wifiManager?.connectionInfo
+                // Remove any surrounding quotes from the SSID (some devices return quotes)
+                val currentSSID = wifiInfo?.ssid?.replace("\"", "")
+                connectionStatus = if (currentSSID.equals("AndroidWifi", ignoreCase = true)) {
+                    "Connected to $currentSSID"
+                } else {
+                    "Not connected to androidwifi"
+                }
+            } else {
+                connectionStatus = "Not connected to androidwifi"
+            }
+            delay(5000L) // Check every 5 seconds
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Display the connection status
+            Text(
+                text = connectionStatus,
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Button to navigate back home
+            Button(
+                onClick = { navController.navigate("home") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(text = "Go to Home")
+            }
+        }
+    }
+}
+
+ */
+
 
 @RequiresApi(Build.VERSION_CODES.M)
 @Composable
@@ -3676,6 +3885,9 @@ fun MyNavHost(
             FirstScreen(
                 navController = navController
             )
+        }
+        composable("wififence") {
+            WifiMonitorScreen(navController)
         }
         composable("login") {
             LoginScreen(navController)
