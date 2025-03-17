@@ -185,9 +185,51 @@ import androidx.compose.foundation.text.KeyboardOptions
 import com.example.myhomemachine.VerificationType
 import com.example.myhomemachine.CodeVerificationScreen
 import com.example.myhomemachine.ResetPasswordConfirmScreen
+import java.util.UUID
+import android.widget.TextView
+import com.example.myhomemachine.RetrofitClient
+import com.example.myhomemachine.SwitchBotResponse
+import com.example.myhomemachine.DeviceStatus
+import com.example.myhomemachine.SwitchBotApiService
+import retrofit2.*
+import retrofit2.converter.gson.GsonConverterFactory
+import kotlin.math.ln
+import kotlin.math.exp
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.nativeCanvas
 
+
+
+
+// lifx stuff super unsecure
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
 private const val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
+
+// switchbot therm stuff also super unsecure
+private const val BASE_URL = "https://api.switch-bot.com/"
+private const val sbdeviceId = "F90D2BD4D12F" // Replace with your actual deviceId
+private const val sbtoken = "68bc54e2a5495d4a8f560a38744a2a4178ff857528dd3a84f4eb51b6d75b516070f33a7b823e555f5fdb7d530df79997"
+private const val sbsecret = "28f1ee6611fbf2be9cfab357bc7a3480"
+
+data class SwitchBotResponse(
+    val statusCode: Int,
+    val body: DeviceStatus,
+    val message: String
+)
+
+data class DeviceStatus(
+    val deviceId: String,
+    val deviceType: String,
+    val hubDeviceId: String,
+    val humidity: Float,
+    val temperature: Float,
+    val battery: Float
+)
 
 class SharedViewModel(application: Application) : AndroidViewModel(application) {
     val logs = mutableStateListOf<String>()
@@ -236,6 +278,81 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    // ✅ Fetch Temperature from SwitchBot API
+    /*
+    private fun fetchTemperature() {
+        val timestamp = System.currentTimeMillis().toString()
+        val nonce = UUID.randomUUID().toString()
+        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(OkHttpClient.Builder().build())
+            .build()
+
+        val apiService = retrofit.create(SwitchBotApiService::class.java)
+
+        apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp)
+            .enqueue(object : retrofit2.Callback<SwitchBotResponse> {
+                override fun onResponse(call: retrofit2.Call<SwitchBotResponse>, response: retrofit2.Response<SwitchBotResponse>) {
+                    if (response.isSuccessful) {
+                        val temp = response.body()?.body?.temperature ?: 0.0
+                        runOnUiThread {
+                            val temperatureTextView: TextView = findViewById(R.id.temperatureTextView)
+                            temperatureTextView.text = "Temperature: $temp °C"
+                        }
+                        Log.d("SwitchBot", "Temperature: $temp °C")
+                    } else {
+                        Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
+                    }
+                }
+
+                override fun onFailure(call: retrofit2.Call<SwitchBotResponse>, t: Throwable) {
+                    Log.e("SwitchBot", "Failed to fetch temperature", t)
+                }
+            })
+    }
+
+     */
+/*
+    suspend fun fetchTemperature(): Double? {
+        val timestamp = System.currentTimeMillis().toString()
+        val nonce = UUID.randomUUID().toString()
+        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(OkHttpClient.Builder().build())
+            .build()
+
+        val apiService = retrofit.create(SwitchBotApiService::class.java)
+
+        return try {
+            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
+            if (response.isSuccessful) {
+                response.body()?.body?.temperature?.toDouble() // ✅ Convert Float to Double
+            } else {
+                Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("SwitchBot", "Failed to fetch temperature", e)
+            null
+        }
+    }
+
+    private fun generateSignature(token: String, secret: String, timestamp: String, nonce: String): String {
+        val data = token + timestamp + nonce
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
+        return android.util.Base64.encodeToString(mac.doFinal(data.toByteArray()), android.util.Base64.NO_WRAP)
+    }
+
+ */
+
 
     private fun turnLightOn() {
         val apiService = RetrofitClient.instance
@@ -386,6 +503,258 @@ class DeviceController {
     }
 }
 
+private fun generateSignature(token: String, secret: String, timestamp: String, nonce: String): String {
+    val data = token + timestamp + nonce
+    val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+    mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
+    return android.util.Base64.encodeToString(mac.doFinal(data.toByteArray()), android.util.Base64.NO_WRAP)
+}
+
+
+
+/*
+suspend fun fetchTemperature(): Double? {
+    val timestamp = System.currentTimeMillis().toString()
+    val nonce = UUID.randomUUID().toString()
+    val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+
+    val retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .addConverterFactory(GsonConverterFactory.create())
+        .client(OkHttpClient.Builder().build())
+        .build()
+
+    val apiService = retrofit.create(SwitchBotApiService::class.java)
+
+    return try {
+        val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
+
+        // ✅ Log the full API response to check for issues
+        Log.d("SwitchBot", "API Response: ${response.raw()}") // Logs raw HTTP response
+        Log.d("SwitchBot", "Response Body: ${response.body()}") // Logs response JSON
+
+        if (response.isSuccessful) {
+            val temp = response.body()?.body?.temperature
+            if (temp == null) {
+                Log.e("SwitchBot", "Temperature is null in response")
+                return null
+            }
+            Log.d("SwitchBot", "Received Temperature: $temp °C")
+            return temp.toDouble()
+        } else {
+            Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
+            null
+        }
+    } catch (e: Exception) {
+        Log.e("SwitchBot", "Failed to fetch temperature", e)
+        null
+    }
+}
+*/
+/*
+suspend fun forceCloudSync() {
+    withContext(Dispatchers.IO) {
+        val timestamp = System.currentTimeMillis().toString()
+        val nonce = UUID.randomUUID().toString()
+        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL) // e.g., "https://api.switch-bot.com/"
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(OkHttpClient.Builder().build())
+            .build()
+
+        val apiService = retrofit.create(SwitchBotApiService::class.java)
+
+        try {
+            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
+            Log.d("SwitchBot", "Cloud Sync Response: ${response.body()}")
+        } catch (e: Exception) {
+            Log.e("SwitchBot", "Failed to sync SwitchBot cloud", e)
+        }
+    }
+}
+
+
+suspend fun fetchTemperature(): Double? {
+    return withContext(Dispatchers.IO) {
+        val timestamp = System.currentTimeMillis().toString()
+        val nonce = UUID.randomUUID().toString()
+        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+
+        Log.d("SwitchBot", "Sending API Request to: $BASE_URL/v1.1/devices/$sbdeviceId/status")
+        Log.d("SwitchBot", "Headers: Authorization=$sbtoken, sign=$sign, nonce=$nonce, t=$timestamp")
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(OkHttpClient.Builder().build())
+            .build()
+
+        val apiService = retrofit.create(SwitchBotApiService::class.java)
+
+        try {
+            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
+            Log.d("SwitchBot", "API Response: ${response.raw()}")
+            Log.d("SwitchBot", "Response Body: ${response.body()}")
+
+            if (response.isSuccessful) {
+                val temp = response.body()?.body?.temperature
+                Log.d("SwitchBot", "Received Temperature: $temp °C")
+                temp?.toDouble()
+            } else {
+                Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("SwitchBot", "Failed to fetch temperature", e)
+            null
+        }
+    }
+}
+*/
+
+data class MeterStatus(
+    val temperature: Double,
+    val humidity: Double,
+    val battery: Int,
+    val dewPoint: Double,
+    val heatIndex: Double,
+    val absoluteHumidity: Double,
+    val vaporPressure: Double,
+    val saturationVaporPressure: Double,
+    val vaporPressureDeficit: Double,
+    val mixingRatio: Double,
+    val enthalpy: Double
+)
+
+
+suspend fun forceCloudSync() {
+    withContext(Dispatchers.IO) {
+        val timestamp = System.currentTimeMillis().toString()
+        val nonce = UUID.randomUUID().toString()
+        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL) // e.g., "https://api.switch-bot.com/"
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(OkHttpClient.Builder().build())
+            .build()
+
+        val apiService = retrofit.create(SwitchBotApiService::class.java)
+
+        try {
+            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
+            Log.d("SwitchBot", "Cloud Sync Response: ${response.body()}")
+        } catch (e: Exception) {
+            Log.e("SwitchBot", "Failed to sync SwitchBot cloud", e)
+        }
+    }
+}
+
+fun computeHeatIndex(tempC: Double, rh: Double): Double {
+    val tempF = tempC * 9 / 5 + 32
+    // Constants for the heat index formula (in Fahrenheit)
+    val c1 = -42.379
+    val c2 = 2.04901523
+    val c3 = 10.14333127
+    val c4 = -0.22475541
+    val c5 = -6.83783e-3
+    val c6 = -5.481717e-2
+    val c7 = 1.22874e-3
+    val c8 = 8.5282e-4
+    val c9 = -1.99e-6
+
+    val hiF = c1 + c2 * tempF + c3 * rh + c4 * tempF * rh +
+            c5 * tempF * tempF + c6 * rh * rh +
+            c7 * tempF * tempF * rh + c8 * tempF * rh * rh +
+            c9 * tempF * tempF * rh * rh
+    // Convert back to Celsius
+    return (hiF - 32) * 5 / 9
+}
+
+suspend fun fetchMeterStatus(): MeterStatus? {
+    return withContext(Dispatchers.IO) {
+        val timestamp = System.currentTimeMillis().toString()
+        val nonce = UUID.randomUUID().toString()
+        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+
+        Log.d("SwitchBot", "Sending API Request to: $BASE_URL/v1.1/devices/$sbdeviceId/status")
+        Log.d("SwitchBot", "Headers: Authorization=$sbtoken, sign=$sign, nonce=$nonce, t=$timestamp")
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(OkHttpClient.Builder().build())
+            .build()
+
+        val apiService = retrofit.create(SwitchBotApiService::class.java)
+
+        try {
+            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
+            Log.d("SwitchBot", "API Response: ${response.raw()}")
+            Log.d("SwitchBot", "Response Body: ${response.body()}")
+
+            if (response.isSuccessful) {
+                // Assuming response.body()?.body returns an object with temperature, humidity, and battery properties.
+                val body = response.body()?.body
+                val temp = body?.temperature
+                val hum = body?.humidity
+                val bat = body?.battery
+                Log.d("SwitchBot", "Received Temperature: $temp °C, Humidity: $hum %, Battery: $bat %")
+                if (temp != null && hum != null && bat != null) {
+                    val temperature = temp.toDouble()
+                    val humidity = hum.toDouble()
+
+                    // Compute Dew Point using the Magnus-Tetens approximation.
+                    val a = 17.27
+                    val b = 237.7
+                    val gamma = ln(humidity / 100.0) + (a * temperature) / (b + temperature)
+                    val dewPoint = (b * gamma) / (a - gamma)
+
+                    // Compute Heat Index (feels-like temperature)
+                    val heatIndex = computeHeatIndex(temperature, humidity)
+
+                    // Compute Saturation Vapor Pressure (in hPa)
+                    val satVaporPressure = 6.112 * exp(17.67 * temperature / (temperature + 243.5))
+                    // Actual Vapor Pressure (in hPa)
+                    val vaporPressure = (humidity / 100.0) * satVaporPressure
+                    // Absolute Humidity (grams per cubic meter)
+                    val absoluteHumidity = (6.112 * exp(17.67 * temperature / (temperature + 243.5)) * humidity * 2.1674) / (273.15 + temperature)
+                    // Vapor Pressure Deficit (in hPa)
+                    val vaporPressureDeficit = satVaporPressure - vaporPressure
+                    // Mixing Ratio (kg water vapor per kg dry air) assuming standard pressure (1013.25 hPa)
+                    val mixingRatio = 0.622 * vaporPressure / (1013.25 - vaporPressure)
+                    // Enthalpy (approximate, in kJ/kg dry air)
+                    val enthalpy = 1.006 * temperature + mixingRatio * (2501 + 1.86 * temperature)
+
+                    MeterStatus(
+                        temperature = temperature,
+                        humidity = humidity,
+                        battery = bat.toInt(),
+                        dewPoint = dewPoint,
+                        heatIndex = heatIndex,
+                        absoluteHumidity = absoluteHumidity,
+                        vaporPressure = vaporPressure,
+                        saturationVaporPressure = satVaporPressure,
+                        vaporPressureDeficit = vaporPressureDeficit,
+                        mixingRatio = mixingRatio,
+                        enthalpy = enthalpy
+                    )
+                } else {
+                    null
+                }
+            } else {
+                Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("SwitchBot", "Failed to fetch meter status", e)
+            null
+        }
+    }
+}
+
 @Composable
 fun FirstScreen(navController: NavHostController) {
     Surface(
@@ -490,6 +859,32 @@ fun FirstScreen(navController: NavHostController) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "Sign Up",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                Button(
+                    onClick = { navController.navigate("home") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .animateContentSize(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 4.dp,
+                        pressedElevation = 8.dp
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "DEV BYPASS",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -1367,7 +1762,7 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
         "Camera" to listOf("RaspberryPiCamera"),
         "Light" to listOf("LIFX Smart Light"),  // Only one smart light option now
         "Plug" to listOf("Shelly Smart Plug"),  // Only one plug option now
-        "Sensor" to listOf("ThermoSync_Q5", "BreezeIQ_G87")
+        "Sensor" to listOf("SwitchBot Meter")
     )
 
 
@@ -2622,13 +3017,12 @@ fun CamerasScreen(navController: NavHostController) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SensorsScreen(navController: NavHostController) {
-    var knownSensors = DeviceManager.knownSensors
+    val knownSensors = DeviceManager.knownSensors
     var selectedSensor by remember { mutableStateOf<String?>(null) }
     var expanded by remember { mutableStateOf(false) }
-
-    // Example data for temperature and air quality history
-    val temperatureHistory = listOf(72, 74, 76, 75, 73)
-    val airQualityHistory = listOf(42, 39, 47, 40, 43)
+    var currentMeterStatus by remember { mutableStateOf<MeterStatus?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var showCelsius by remember { mutableStateOf(true) }
 
     Scaffold(
         topBar = {
@@ -2647,11 +3041,13 @@ fun SensorsScreen(navController: NavHostController) {
             )
         }
     ) { paddingValues ->
+        // Make the entire screen scrollable by wrapping everything in a Column with verticalScroll
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
+                .verticalScroll(rememberScrollState())  // <-- Enables vertical scrolling
         ) {
             // Sensor Selection Card
             Card(
@@ -2700,49 +3096,442 @@ fun SensorsScreen(navController: NavHostController) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Sensor Data Display
-            if (selectedSensor != null) {
-                when (selectedSensor) {
-                    "Temperature Sensor" -> TemperatureDisplay(temperatureHistory)
-                    "Air Quality Sensor" -> AirQualityDisplay(airQualityHistory)
+            // Show button only if SwitchBot Meter is selected
+            if (selectedSensor == "SwitchBot Meter") {
+                Button(
+                    onClick = {
+                        isLoading = true
+                        CoroutineScope(Dispatchers.IO).launch {
+                            forceCloudSync() // Force cloud sync first
+                            delay(1000) // Adjust delay as needed
+
+                            val meterStatus = fetchMeterStatus()
+                            withContext(Dispatchers.Main) {
+                                currentMeterStatus = meterStatus
+                                isLoading = false
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Get Meter Status")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        showCelsius = !showCelsius
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = if (showCelsius) "Switch to Fahrenheit" else "Switch to Celsius"
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Sensor Data Display
+                MeterStatusDisplay(
+                    currentMeterStatus = currentMeterStatus,
+                    isLoading = isLoading,
+                    showCelsius = showCelsius
+                )
+            }
+        }
+    }
+}
+
+
+/*
+// WORKING
+@Composable
+fun MeterStatusDisplay(currentMeterStatus: MeterStatus?, isLoading: Boolean) {
+    Card(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "SwitchBot Meter",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            if (isLoading) {
+                Text(
+                    text = "Fetching meter status...",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else {
+                if (currentMeterStatus != null) {
+                    Text(
+                        text = "Temperature: ${"%.2f".format(currentMeterStatus.temperature)} °C",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Humidity: ${"%.2f".format(currentMeterStatus.humidity)} %",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Battery: ${currentMeterStatus.battery} %",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Dew Point: ${"%.2f".format(currentMeterStatus.dewPoint)} °C",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Heat Index: ${"%.2f".format(currentMeterStatus.heatIndex)} °C",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Absolute Humidity: ${"%.2f".format(currentMeterStatus.absoluteHumidity)} g/m³",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Saturation Vapor Pressure: ${"%.2f".format(currentMeterStatus.saturationVaporPressure)} hPa",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Vapor Pressure: ${"%.2f".format(currentMeterStatus.vaporPressure)} hPa",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Vapor Pressure Deficit: ${"%.2f".format(currentMeterStatus.vaporPressureDeficit)} hPa",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Mixing Ratio: ${"%.2f".format(currentMeterStatus.mixingRatio)}",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Enthalpy: ${"%.2f".format(currentMeterStatus.enthalpy)} kJ/kg",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                } else {
+                    Text(
+                        text = "Press 'Get Meter Status' to fetch data",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
             }
         }
+    }
+}
+
+ */
+
+
+fun cToF(celsius: Double): Double {
+    return celsius * 9 / 5 + 32
+}
+
+// Custom radial gauge for Temperature
+@Composable
+fun TemperatureGauge(
+    temperature: Double,
+    minTemp: Double = 0.0,
+    maxTemp: Double = 40.0,
+    degreeLabel: String = "°C",
+    modifier: Modifier = Modifier
+) {
+    val sweepAngle = (((temperature - minTemp) / (maxTemp - minTemp)) * 270.0).toFloat()
+    Canvas(modifier = modifier) {
+        // Background arc (full gauge)
+        drawArc(
+            color = Color.LightGray,
+            startAngle = 135f,
+            sweepAngle = 270f,
+            useCenter = false,
+            style = Stroke(width = 20f)
+        )
+        // Foreground arc showing current temperature
+        drawArc(
+            color = Color.Red,
+            startAngle = 135f,
+            sweepAngle = sweepAngle,
+            useCenter = false,
+            style = Stroke(width = 26f)
+        )
+        // Draw the temperature value in the center
+        drawContext.canvas.nativeCanvas.apply {
+            drawText(
+                "${"%.3f".format(temperature)} $degreeLabel",
+                size.width / 2,
+                size.height / 2 + 12, // adjustment for vertical centering
+                android.graphics.Paint().apply {
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    textSize = 40f
+                    color = android.graphics.Color.BLACK
+                }
+            )
+        }
+    }
+}
+
+// Custom radial gauge for Humidity
+@Composable
+fun HumidityGauge(
+    humidity: Double,
+    modifier: Modifier = Modifier
+) {
+    val sweepAngle = ((humidity) / 100.0) * 270f
+    Canvas(modifier = modifier) {
+        drawArc(
+            color = Color.LightGray,
+            startAngle = 135f,
+            sweepAngle = 270f,
+            useCenter = false,
+            style = Stroke(width = 16f)
+        )
+        drawArc(
+            color = Color.Blue,
+            startAngle = 135f,
+            sweepAngle = sweepAngle.toFloat(),
+            useCenter = false,
+            style = Stroke(width = 30f)
+        )
+        drawContext.canvas.nativeCanvas.apply {
+            drawText(
+                "${"%.1f".format(humidity)} %",
+                size.width / 2,
+                size.height / 2 + 12,
+                android.graphics.Paint().apply {
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    textSize = 40f
+                    color = android.graphics.Color.BLACK
+                }
+            )
+        }
+    }
+}
+
+// Custom radial gauge for Battery
+@Composable
+fun BatteryGauge(
+    battery: Int,
+    modifier: Modifier = Modifier
+) {
+    val sweepAngle = (battery / 100f) * 270f
+    Canvas(modifier = modifier) {
+        drawArc(
+            color = Color.LightGray,
+            startAngle = 135f,
+            sweepAngle = 270f,
+            useCenter = false,
+            style = Stroke(width = 36f)
+        )
+        drawArc(
+            color = Color.Green,
+            startAngle = 135f,
+            sweepAngle = sweepAngle,
+            useCenter = false,
+            style = Stroke(width = 50f)
+        )
+        drawContext.canvas.nativeCanvas.apply {
+            drawText(
+                "$battery%",
+                size.width / 2,
+                size.height / 2 + 12,
+                android.graphics.Paint().apply {
+                    textAlign = android.graphics.Paint.Align.CENTER
+                    textSize = 40f
+                    color = android.graphics.Color.BLACK
+                }
+            )
+        }
+    }
+}
+
+// Wrapper composable for Temperature
+@Composable
+fun TemperatureGaugeWithLabel(
+    temperature: Double,
+    minTemp: Double,
+    maxTemp: Double,
+    degreeLabel: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        TemperatureGauge(
+            temperature = temperature,
+            minTemp = minTemp,
+            maxTemp = maxTemp,
+            degreeLabel = degreeLabel,
+            modifier = Modifier.size(150.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Temperature",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+// Wrapper composable for Humidity
+@Composable
+fun HumidityGaugeWithLabel(
+    humidity: Double,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        HumidityGauge(
+            humidity = humidity,
+            modifier = Modifier.size(150.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Humidity",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+// Wrapper composable for Battery
+@Composable
+fun BatteryGaugeWithLabel(
+    battery: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        BatteryGauge(
+            battery = battery,
+            modifier = Modifier.size(150.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Battery",
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
 @Composable
-fun TemperatureDisplay(temperatureHistory: List<Int>) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
+fun MeterStatusDisplay(
+    currentMeterStatus: MeterStatus?,
+    isLoading: Boolean,
+    showCelsius: Boolean // <-- new parameter
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Temperature History",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 16.dp)
+                text = "SwitchBot Meter",
+                style = MaterialTheme.typography.titleMedium
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            if (isLoading) {
+                Text(
+                    text = "Fetching meter status...",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            } else {
+                if (currentMeterStatus != null) {
+                    // Convert the temperature-based values if showCelsius is false
+                    val temperature = if (showCelsius) {
+                        currentMeterStatus.temperature
+                    } else {
+                        cToF(currentMeterStatus.temperature)
+                    }
+                    val dewPoint = if (showCelsius) {
+                        currentMeterStatus.dewPoint
+                    } else {
+                        cToF(currentMeterStatus.dewPoint)
+                    }
+                    val heatIndex = if (showCelsius) {
+                        currentMeterStatus.heatIndex
+                    } else {
+                        cToF(currentMeterStatus.heatIndex)
+                    }
 
-            temperatureHistory.forEachIndexed { index, temp ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Time ${index + 1}")
-                    Text("$temp°F", style = MaterialTheme.typography.titleMedium)
-                }
-                if (index < temperatureHistory.lastIndex) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                    // Decide the label for degrees
+                    val degreeLabel = if (showCelsius) "°C" else "°F"
+
+                    // Stack each gauge vertically, each with its own label
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // If you want the gauge range to adjust for °F, you can do so:
+                        TemperatureGaugeWithLabel(
+                            temperature = temperature,
+                            minTemp = if (showCelsius) 0.0 else 32.0,
+                            maxTemp = if (showCelsius) 40.0 else 104.0,
+                            degreeLabel = degreeLabel
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HumidityGaugeWithLabel(humidity = currentMeterStatus.humidity)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        BatteryGaugeWithLabel(battery = currentMeterStatus.battery)
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    // Display additional computed metrics as text
+                    Text(
+                        text = "Temperature: %.2f $degreeLabel".format(temperature),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Humidity: %.2f %%".format(currentMeterStatus.humidity),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Battery: ${currentMeterStatus.battery} %",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Dew Point: %.2f $degreeLabel".format(dewPoint),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Heat Index: %.2f $degreeLabel".format(heatIndex),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Absolute Humidity: %.2f g/m³".format(currentMeterStatus.absoluteHumidity),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Saturation Vapor Pressure: %.2f hPa".format(currentMeterStatus.saturationVaporPressure),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Vapor Pressure: %.2f hPa".format(currentMeterStatus.vaporPressure),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Vapor Pressure Deficit: %.2f hPa".format(currentMeterStatus.vaporPressureDeficit),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Mixing Ratio: %.2f".format(currentMeterStatus.mixingRatio),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Enthalpy: %.2f kJ/kg".format(currentMeterStatus.enthalpy),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                } else {
+                    Text(
+                        text = "Press 'Get Meter Status' to fetch data",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
                 }
             }
         }
     }
 }
+
+
+
 
 @Composable
 fun AirQualityDisplay(airQualityHistory: List<Int>) {
