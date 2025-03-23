@@ -179,6 +179,9 @@ import com.example.myhomemachine.SettingsScreen
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.myhomemachine.ForgotPasswordScreen
+import com.example.myhomemachine.data.PersistentDeviceManager
+import com.example.myhomemachine.SessionManager
+
 
 import androidx.navigation.navArgument
 import androidx.compose.foundation.text.KeyboardOptions
@@ -205,7 +208,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.core.app.NotificationCompat
-
+import androidx.compose.ui.platform.LocalContext
 import android.app.PendingIntent
 import androidx.core.app.NotificationManagerCompat
 
@@ -266,11 +269,15 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestPermissions()
         createNotificationChannel()
         sendNotification("Welcome to My Home", "Notification is working")
-        /**
-         * Create a notification channel for devices running Android 8.0 or higher.
-         * A channel groups notifications with similar behavior.
-         */
 
+        // Initialize SessionManager and PersistentDeviceManager
+        val sessionManager = SessionManager(this)
+        val deviceManager = PersistentDeviceManager(this)
+
+        // Load devices from persistent storage if user is logged in
+        if (sessionManager.isLoggedIn()) {
+            deviceManager.loadDevices()
+        }
 
         val sharedViewModel: SharedViewModel by viewModels()
         sharedViewModel.initialize(this)
@@ -287,13 +294,14 @@ class MainActivity : AppCompatActivity() {
                         onTurnLightOff = { turnLightOff() },
                         onBrightnessChange = { brightness -> setBrightness(brightness) },
                         setBrightness = { brightness -> this.setBrightness(brightness) },
-                        onSetColor = { color -> setColor(color) }
+                        onSetColor = { color -> setColor(color) },
+                        sessionManager = sessionManager,  // Pass SessionManager to NavHost
+                        deviceManager = deviceManager     // Pass DeviceManager to NavHost
                     )
                 }
             }
         }
     }
-
 
     private fun createNotificationChannel() {
         // Notification channels are required on Android 8.0+ (API level 26+)
@@ -1583,12 +1591,31 @@ fun LoginScreen(navController: NavHostController) {
     // Add ViewModel
     val viewModel: AuthViewModel = viewModel()
     var authState by remember { mutableStateOf<AuthViewModel.AuthState>(AuthViewModel.AuthState.Idle) }
+    val context = LocalContext.current
 
     // State variables
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var rememberMe by remember { mutableStateOf(false) }
+
+    // Initialize SessionManager
+    val sessionManager = remember { SessionManager(context) }
+
+    // Check if user is already logged in with "Remember Me" enabled
+    LaunchedEffect(Unit) {
+        if (sessionManager.isLoggedIn() && sessionManager.isRememberMeEnabled()) {
+            // Load user's devices from persistent storage
+            val deviceManager = PersistentDeviceManager(context)
+            deviceManager.loadDevices()
+
+            // Navigate to home screen
+            navController.navigate("home") {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -1701,12 +1728,28 @@ fun LoginScreen(navController: NavHostController) {
                         singleLine = true
                     )
 
-                    // Forgot password button
-                    TextButton(
-                        onClick = { navController.navigate("forgot-password") },
-                        modifier = Modifier.align(Alignment.End)
+                    // Remember Me checkbox
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Forgot Password?")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            androidx.compose.material3.Checkbox(
+                                checked = rememberMe,
+                                onCheckedChange = { newValue -> rememberMe = newValue }
+                            )
+                            Text("Remember Me")
+                        }
+
+                        // Forgot password button
+                        TextButton(
+                            onClick = { navController.navigate("forgot-password") }
+                        ) {
+                            Text("Forgot Password?")
+                        }
                     }
 
                     // Error message display
@@ -1788,6 +1831,16 @@ fun LoginScreen(navController: NavHostController) {
     LaunchedEffect(authState) {
         when (authState) {
             is AuthViewModel.AuthState.Success -> {
+                val successState = authState as AuthViewModel.AuthState.Success
+                val userId = successState.userId ?: "user_id"
+
+                // Create a login session with "Remember Me" preference
+                sessionManager.createLoginSession(userId, email, rememberMe)
+
+                // Load user's devices from persistent storage
+                val deviceManager = PersistentDeviceManager(context)
+                deviceManager.loadDevices()
+
                 // Navigate to home screen on successful login
                 navController.navigate("home") {
                     popUpTo(0) { inclusive = true }
@@ -1811,7 +1864,10 @@ fun LoginScreen(navController: NavHostController) {
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun HomeScreen(navController: NavHostController) {
+fun HomeScreen(
+    navController: NavHostController,
+    sessionManager: SessionManager // Add this parameter
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -2017,6 +2073,10 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
     var customDeviceName by remember { mutableStateOf("") }
     var typeExpanded by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
+
+    // Get context and create PersistentDeviceManager
+    val context = LocalContext.current
+    val deviceManager = remember { PersistentDeviceManager(context) }
 
     // Define device types and associated device names
     val deviceTypes = listOf("Camera", "Light", "Plug", "Sensor")
@@ -2237,11 +2297,13 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                 Button(
                     onClick = {
                         val deviceName = customDeviceName.ifEmpty { selectedDeviceName ?: "" }
-                        DeviceManager.addDevice(deviceName, selectedDeviceType)
+
+                        // Use PersistentDeviceManager instead of DeviceManager
+                        deviceManager.addDevice(deviceName, selectedDeviceType)
+
                         showConfirmDialog = false
-                        //navController.navigate("home") {
-                        //    popUpTo("home") { inclusive = false }
-                        //}
+                        onDeviceAdded()
+                        navController.navigateUp()
                     }
                 ) {
                     Text("Confirm")
@@ -2255,7 +2317,6 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
         )
     }
 }
-
 
 //working lightscreen 2.0
 /*
@@ -2498,6 +2559,11 @@ fun LightsScreen(
     var brightness by remember { androidx.compose.runtime.mutableFloatStateOf(0.8f) }
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showConfirmation by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
+
+    // Get context and PersistentDeviceManager
+    val context = LocalContext.current
+    val deviceManager = remember { PersistentDeviceManager(context) }
 
     Scaffold(
         topBar = {
@@ -2525,11 +2591,38 @@ fun LightsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
-            LightSelectionCard(
-                knownLights = knownLights,
-                selectedLight = selectedLight,
-                onLightSelected = { selectedLight = it }
-            )
+            // Device Selection Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Select Light",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    if (knownLights.isEmpty()) {
+                        Text(
+                            text = "No lights added yet. Add a light from the home screen.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    } else {
+                        knownLights.forEach { light ->
+                            DeviceListItem(
+                                deviceName = light,
+                                onSelect = { selectedLight = light },
+                                onDelete = { showDeleteConfirmation = light },
+                                isSelected = light == selectedLight
+                            )
+                        }
+                    }
+                }
+            }
 
             if (selectedLight != null) {
                 Spacer(modifier = Modifier.height(16.dp))
@@ -2568,6 +2661,36 @@ fun LightsScreen(
                 )
             }
         }
+    }
+
+    // Delete confirmation dialog
+    showDeleteConfirmation?.let { deviceName ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Delete Device") },
+            text = { Text("Are you sure you want to remove $deviceName?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deviceManager.removeDevice(deviceName, "Light")
+                        if (selectedLight == deviceName) {
+                            selectedLight = null
+                        }
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showScheduleDialog) {
@@ -3018,8 +3141,11 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
     var knownPlugs = DeviceManager.knownPlugs
     var selectedPlug by remember { mutableStateOf<String?>(null) }
     var isPlugOn by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
-    var showScheduleDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
+
+    // Get context and PersistentDeviceManager
+    val context = LocalContext.current
+    val deviceManager = remember { PersistentDeviceManager(context) }
 
     Scaffold(
         topBar = {
@@ -3055,35 +3181,21 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedPlug ?: "Choose a plug",
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
+                    if (knownPlugs.isEmpty()) {
+                        Text(
+                            text = "No plugs added yet. Add a plug from the home screen.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
-
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            knownPlugs.forEach { plug ->
-                                DropdownMenuItem(
-                                    text = { Text(plug) },
-                                    onClick = {
-                                        selectedPlug = plug
-                                        expanded = false
-                                    }
-                                )
-                            }
+                    } else {
+                        knownPlugs.forEach { plug ->
+                            DeviceListItem(
+                                deviceName = plug,
+                                onSelect = { selectedPlug = plug },
+                                onDelete = { showDeleteConfirmation = plug },
+                                isSelected = plug == selectedPlug
+                            )
                         }
                     }
                 }
@@ -3136,6 +3248,36 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
             }
         }
     }
+
+    // Delete confirmation dialog
+    showDeleteConfirmation?.let { deviceName ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Delete Device") },
+            text = { Text("Are you sure you want to remove $deviceName?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deviceManager.removeDevice(deviceName, "Plug")
+                        if (selectedPlug == deviceName) {
+                            selectedPlug = null
+                        }
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -3143,10 +3285,13 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
 fun CamerasScreen(navController: NavHostController) {
     var knownCameras = DeviceManager.knownCameras
     var selectedCamera by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
-
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
     var motionDetectionLight by remember { mutableStateOf(true) }
     var motionDetectionPlug by remember { mutableStateOf(true) }
+
+    // Get context and PersistentDeviceManager
+    val context = LocalContext.current
+    val deviceManager = remember { PersistentDeviceManager(context) }
 
     Scaffold(
         topBar = {
@@ -3182,35 +3327,21 @@ fun CamerasScreen(navController: NavHostController) {
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedCamera ?: "Choose a camera",
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
+                    if (knownCameras.isEmpty()) {
+                        Text(
+                            text = "No cameras added yet. Add a camera from the home screen.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
-
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            knownCameras.forEach { camera ->
-                                DropdownMenuItem(
-                                    text = { Text(camera) },
-                                    onClick = {
-                                        selectedCamera = camera
-                                        expanded = false
-                                    }
-                                )
-                            }
+                    } else {
+                        knownCameras.forEach { camera ->
+                            DeviceListItem(
+                                deviceName = camera,
+                                onSelect = { selectedCamera = camera },
+                                onDelete = { showDeleteConfirmation = camera },
+                                isSelected = camera == selectedCamera
+                            )
                         }
                     }
                 }
@@ -3273,18 +3404,51 @@ fun CamerasScreen(navController: NavHostController) {
             }
         }
     }
-}
 
+    // Delete confirmation dialog
+    showDeleteConfirmation?.let { deviceName ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Delete Device") },
+            text = { Text("Are you sure you want to remove $deviceName?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deviceManager.removeDevice(deviceName, "Camera")
+                        if (selectedCamera == deviceName) {
+                            selectedCamera = null
+                        }
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SensorsScreen(navController: NavHostController) {
     val knownSensors = DeviceManager.knownSensors
     var selectedSensor by remember { mutableStateOf<String?>(null) }
-    var expanded by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
     var currentMeterStatus by remember { mutableStateOf<MeterStatus?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var showCelsius by remember { mutableStateOf(true) }
+
+    // Get context and PersistentDeviceManager
+    val context = LocalContext.current
+    val deviceManager = remember { PersistentDeviceManager(context) }
 
     Scaffold(
         topBar = {
@@ -3309,7 +3473,7 @@ fun SensorsScreen(navController: NavHostController) {
                 .fillMaxSize()
                 .padding(paddingValues)
                 .padding(16.dp)
-                .verticalScroll(rememberScrollState())  // <-- Enables vertical scrolling
+                .verticalScroll(rememberScrollState())
         ) {
             // Sensor Selection Card
             Card(
@@ -3322,35 +3486,21 @@ fun SensorsScreen(navController: NavHostController) {
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedSensor ?: "Choose a sensor",
-                            onValueChange = {},
-                            readOnly = true,
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor()
+                    if (knownSensors.isEmpty()) {
+                        Text(
+                            text = "No sensors added yet. Add a sensor from the home screen.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(vertical = 8.dp)
                         )
-
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false }
-                        ) {
-                            knownSensors.forEach { sensor ->
-                                DropdownMenuItem(
-                                    text = { Text(sensor) },
-                                    onClick = {
-                                        selectedSensor = sensor
-                                        expanded = false
-                                    }
-                                )
-                            }
+                    } else {
+                        knownSensors.forEach { sensor ->
+                            DeviceListItem(
+                                deviceName = sensor,
+                                onSelect = { selectedSensor = sensor },
+                                onDelete = { showDeleteConfirmation = sensor },
+                                isSelected = sensor == selectedSensor
+                            )
                         }
                     }
                 }
@@ -3403,8 +3553,37 @@ fun SensorsScreen(navController: NavHostController) {
             }
         }
     }
-}
 
+    // Delete confirmation dialog
+    showDeleteConfirmation?.let { deviceName ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Delete Device") },
+            text = { Text("Are you sure you want to remove $deviceName?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deviceManager.removeDevice(deviceName, "Sensor")
+                        if (selectedSensor == deviceName) {
+                            selectedSensor = null
+                        }
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
 
 /*
 // WORKING
@@ -3830,6 +4009,10 @@ fun AirQualityDisplay(airQualityHistory: List<Int>) {
 
 @Composable
 fun SchedulePage(navController: NavHostController) {
+    val context = LocalContext.current
+    val deviceManager = remember { PersistentDeviceManager(context) }
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -3888,7 +4071,25 @@ fun SchedulePage(navController: NavHostController) {
                     } else {
                         // Display each schedule
                         DeviceManager.schedules.forEach { schedule ->
-                            Text(text = schedule, style = MaterialTheme.typography.bodyLarge)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = schedule,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                IconButton(onClick = { showDeleteConfirmation = schedule }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete Schedule",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
@@ -3908,7 +4109,78 @@ fun SchedulePage(navController: NavHostController) {
             }
         }
     }
+
+    // Delete confirmation dialog
+    showDeleteConfirmation?.let { schedule ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Delete Schedule") },
+            text = { Text("Are you sure you want to remove this schedule?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deviceManager.removeSchedule(schedule)
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
+@Composable
+fun DeviceListItem(
+    deviceName: String,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+    isSelected: Boolean
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(onClick = onSelect),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected)
+                MaterialTheme.colorScheme.primaryContainer
+            else
+                MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = deviceName,
+                style = MaterialTheme.typography.bodyLarge
+            )
+
+            IconButton(
+                onClick = onDelete
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
 
 @RequiresApi(Build.VERSION_CODES.M)
 @Composable
@@ -3920,11 +4192,13 @@ fun MyNavHost(
     onTurnLightOff: () -> Unit,
     onBrightnessChange: (Float) -> Unit,
     setBrightness: (Float) -> Unit,
-    onSetColor: (Color) -> Unit
+    onSetColor: (Color) -> Unit,
+    sessionManager: SessionManager,       // Add SessionManager parameter
+    deviceManager: PersistentDeviceManager // Add DeviceManager parameter
 ) {
     NavHost(
         navController = navController,
-        startDestination = "first",
+        startDestination = if (sessionManager.isLoggedIn() && sessionManager.isRememberMeEnabled()) "home" else "first",
         modifier = modifier
     ) {
         composable("shelly") {
@@ -4020,12 +4294,17 @@ fun MyNavHost(
             CodeVerificationScreen(
                 navController = navController,
                 email = email,
-                verificationType = VerificationType.ACCOUNT_DELETION
+                verificationType = VerificationType.ACCOUNT_DELETION,
+                sessionManager = sessionManager,      // Add these parameters
+                deviceManager = deviceManager         // Add these parameters
             )
         }
 
         composable("home") {
-            HomeScreen(navController = navController)
+            HomeScreen(
+                navController = navController,
+                sessionManager = sessionManager // Pass SessionManager to HomeScreen
+            )
         }
         composable("addDevice") {
             AddDeviceScreen(
@@ -4056,7 +4335,11 @@ fun MyNavHost(
             SchedulePage(navController = navController)
         }
         composable("settings") {
-            SettingsScreen(navController = navController)
+            SettingsScreen(
+                navController = navController,
+                sessionManager = sessionManager, // Pass SessionManager to SettingsScreen
+                deviceManager = deviceManager    // Pass DeviceManager to SettingsScreen
+            )
         }
     }
 }
@@ -4073,5 +4356,11 @@ fun PreviewLoginScreen() {
 @Composable
 fun PreviewHomeScreen() {
     val navController = rememberNavController() // Mock NavController for preview
-    HomeScreen(navController = navController)
+    val context = LocalContext.current
+    val mockSessionManager = remember { SessionManager(context) } // Create mock SessionManager for preview
+
+    HomeScreen(
+        navController = navController,
+        sessionManager = mockSessionManager
+    )
 }

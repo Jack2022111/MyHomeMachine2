@@ -94,6 +94,15 @@ dependencies {
 
     implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1")
     implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    // For EncryptedSharedPreferences
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    // For GSON - JSON serialization/deserialization
+    implementation("com.google.code.gson:gson:2.10.1")
+    // For ViewModel and LiveData support
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.2")
+    // For Encrypted SharedPreferences
+    implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")
 
     // Test dependencies
     testImplementation(libs.junit)

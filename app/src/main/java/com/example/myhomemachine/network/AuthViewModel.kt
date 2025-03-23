@@ -20,7 +20,7 @@ class AuthViewModel : ViewModel() {
     sealed class AuthState {
         object Idle : AuthState()
         object Loading : AuthState()
-        data class Success(val message: String) : AuthState()
+        data class Success(val message: String, val userId: String? = null) : AuthState()
         data class Error(val message: String) : AuthState()
         data class PasswordResetRequested(val message: String) : AuthState()
         data class PasswordResetSuccess(val message: String) : AuthState()
@@ -92,7 +92,17 @@ class AuthViewModel : ViewModel() {
                     withContext(Dispatchers.Main) {
                         if (response.isSuccessful && jsonResponse != null) {
                             val message = jsonResponse.getString("message")
-                            onResult(AuthState.Success(message))
+
+                            // Extract user ID from response if available
+                            var userId: String? = null
+                            if (jsonResponse.has("user") && !jsonResponse.isNull("user")) {
+                                val userObject = jsonResponse.getJSONObject("user")
+                                if (userObject.has("id")) {
+                                    userId = userObject.getString("id")
+                                }
+                            }
+
+                            onResult(AuthState.Success(message, userId))
                         } else {
                             val errorMessage = jsonResponse?.getString("message") ?: "Login failed"
                             onResult(AuthState.Error(errorMessage))

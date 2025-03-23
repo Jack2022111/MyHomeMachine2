@@ -1,5 +1,7 @@
 package com.example.myhomemachine
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -20,37 +22,28 @@ import android.content.Context
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import android.util.Log
-
-// Function to retrieve stored email from SharedPreferences
-private fun getUserEmail(context: Context): String {
-    val sharedPreferences = context.getSharedPreferences("MyHomeMachine", Context.MODE_PRIVATE)
-    return sharedPreferences.getString("user_email", "") ?: ""
-}
-
-// Function to store email in SharedPreferences (call this during login)
-fun saveUserEmail(context: Context, email: String) {
-    val sharedPreferences = context.getSharedPreferences("MyHomeMachine", Context.MODE_PRIVATE)
-    sharedPreferences.edit().putString("user_email", email).apply()
-}
+import com.example.myhomemachine.data.PersistentDeviceManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(navController: NavHostController) {
+fun SettingsScreen(
+    navController: NavHostController,
+    sessionManager: SessionManager,
+    deviceManager: PersistentDeviceManager
+) {
     val viewModel: AuthViewModel = viewModel()
     var showThemeDialog by remember { mutableStateOf(false) }
     var showDeleteAccountDialog by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
     var currentTheme by remember { mutableStateOf("System Default") }
     var authState by remember { mutableStateOf<AuthViewModel.AuthState>(AuthViewModel.AuthState.Idle) }
     var isLoading by remember { mutableStateOf(false) }
 
-    // Get the user's email from SharedPreferences
+    // Get user info from SessionManager
     val context = LocalContext.current
-    var userEmail by remember { mutableStateOf("") }
-
-    LaunchedEffect(Unit) {
-        userEmail = getUserEmail(context)
-        Log.d("SettingsScreen", "Retrieved user email: $userEmail")
-    }
+    val userDetails = sessionManager.getUserDetails()
+    val userEmail = userDetails[SessionManager.KEY_USER_EMAIL] ?: ""
+    var isRememberMeEnabled by remember { mutableStateOf(sessionManager.isRememberMeEnabled()) }
 
     Scaffold(
         topBar = {
@@ -76,7 +69,8 @@ fun SettingsScreen(navController: NavHostController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Account Section
@@ -119,6 +113,21 @@ fun SettingsScreen(navController: NavHostController) {
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Remember Me toggle
+                    SettingsToggle(
+                        icon = Icons.Default.RememberMe,
+                        text = "Remember Me",
+                        initialState = isRememberMeEnabled,
+                        onToggle = { newValue ->
+                            // Update Remember Me preference
+                            val userId = userDetails[SessionManager.KEY_USER_ID] ?: "user_id"
+                            sessionManager.createLoginSession(userId, userEmail, newValue)
+                            isRememberMeEnabled = newValue
+                        }
+                    )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -268,13 +277,7 @@ fun SettingsScreen(navController: NavHostController) {
 
                     // Logout Button
                     OutlinedButton(
-                        onClick = {
-                            // Clear user data on logout
-                            saveUserEmail(context, "")
-                            navController.navigate("first") {
-                                popUpTo(0) { inclusive = true }
-                            }
-                        },
+                        onClick = { showLogoutDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
@@ -335,6 +338,41 @@ fun SettingsScreen(navController: NavHostController) {
         )
     }
 
+    // Logout Confirmation Dialog
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Confirm Logout") },
+            text = {
+                Text(
+                    "Are you sure you want to logout? " +
+                            (if (isRememberMeEnabled) "Your account information will be preserved." else "Your account information will not be preserved.")
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        // Use SessionManager for proper logout
+                        sessionManager.logoutUser()
+                        showLogoutDialog = false
+
+                        // Navigate to first screen
+                        navController.navigate("first") {
+                            popUpTo(0) { inclusive = true }
+                        }
+                    }
+                ) {
+                    Text("Logout")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     // Delete Account Confirmation Dialog
     if (showDeleteAccountDialog) {
         AlertDialog(
@@ -379,15 +417,17 @@ fun SettingsScreen(navController: NavHostController) {
                     onClick = {
                         if (userEmail.isNotEmpty()) {
                             isLoading = true
+                            Log.d("SettingsScreen", "Requesting account deletion for: $userEmail")
                             viewModel.requestAccountDeletion(userEmail) { state ->
                                 isLoading = false
                                 authState = state
+                                Log.d("SettingsScreen", "Deletion request result: $state")
                                 if (state is AuthViewModel.AuthState.Success) {
                                     showDeleteAccountDialog = false
-                                    // Navigate to deletion confirmation screen
+
+                                    // Just navigate to verification screen - don't log out or clear data yet
                                     navController.navigate("delete-account/${userEmail}")
                                 } else if (state is AuthViewModel.AuthState.Error) {
-                                    // Handle error (you could show a snackbar or dialog)
                                     Log.e("SettingsScreen", "Error requesting deletion: ${(state as AuthViewModel.AuthState.Error).message}")
                                 }
                             }

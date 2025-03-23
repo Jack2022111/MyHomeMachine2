@@ -17,13 +17,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.font.FontWeight
 import android.util.Log
+import androidx.compose.ui.platform.LocalContext
+import com.example.myhomemachine.data.PersistentDeviceManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CodeVerificationScreen(
     navController: NavHostController,
     email: String,
-    verificationType: VerificationType
+    verificationType: VerificationType,
+    sessionManager: SessionManager? = null,
+    deviceManager: PersistentDeviceManager? = null
 ) {
     val viewModel: AuthViewModel = viewModel()
     var verificationCode by remember { mutableStateOf("") }
@@ -31,6 +35,13 @@ fun CodeVerificationScreen(
     var authState by remember { mutableStateOf<AuthViewModel.AuthState>(AuthViewModel.AuthState.Idle) }
     var resendState by remember { mutableStateOf<AuthViewModel.AuthState>(AuthViewModel.AuthState.Idle) }
     var showResendSuccess by remember { mutableStateOf(false) }
+
+    // Get context for creating managers if they weren't passed in
+    val context = LocalContext.current
+
+    // Create local instances if not provided (fallback)
+    val localSessionManager = sessionManager ?: remember { SessionManager(context) }
+    val localDeviceManager = deviceManager ?: remember { PersistentDeviceManager(context) }
 
     // Log the email being received
     LaunchedEffect(email) {
@@ -232,8 +243,10 @@ fun CodeVerificationScreen(
                             navController.navigate("reset-password-confirm/$email/$verificationCode")
                         }
                         VerificationType.ACCOUNT_DELETION -> {
+                            Log.d("CodeVerificationScreen", "Sending deletion confirmation with code: $verificationCode")
                             viewModel.confirmAccountDeletion(email, verificationCode) { state ->
                                 authState = state
+                                Log.d("CodeVerificationScreen", "Confirmation result: $state")
                             }
                         }
                     }
@@ -273,6 +286,13 @@ fun CodeVerificationScreen(
                         // This case is handled by navigation to reset-password-confirm
                     }
                     VerificationType.ACCOUNT_DELETION -> {
+                        Log.d("CodeVerificationScreen", "Account deletion confirmed")
+
+                        // Use deleteUserAccount instead of logoutUser
+                        localSessionManager.deleteUserAccount()
+                        localDeviceManager.clearDevices()
+                        Log.d("CodeVerificationScreen", "User data cleared")
+
                         navController.navigate("first") {
                             popUpTo(0) { inclusive = true }
                         }

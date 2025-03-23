@@ -39,5 +39,60 @@ object DeviceManager {
         }
     }
 
+    // NEW FUNCTION: Remove a device with a specific type
+    fun removeDevice(deviceName: String, type: String) {
+        // Get the correct list based on type
+        val deviceList = knownDevices[type] ?: return
 
+        // Remove the device from the list
+        deviceList.remove(deviceName)
+    }
+
+    // NEW FUNCTION: Update all devices of a specific type
+    fun updateDevicesOfType(type: String, devices: List<String>) {
+        val deviceList = knownDevices[type] ?: return
+        deviceList.clear()
+        deviceList.addAll(devices)
+    }
+
+    // NEW FUNCTION: Update all schedules
+    fun updateSchedules(newSchedules: List<String>) {
+        _schedules.clear()
+        _schedules.addAll(newSchedules)
+    }
+
+    // NEW FUNCTION: Update all device types at once
+    fun updateAllDevices(
+        lights: List<String>,
+        plugs: List<String>,
+        cameras: List<String>,
+        sensors: List<String>,
+        newSchedules: List<String>
+    ) {
+        knownDevices["Light"]?.clear()
+        knownDevices["Light"]?.addAll(lights)
+
+        knownDevices["Plug"]?.clear()
+        knownDevices["Plug"]?.addAll(plugs)
+
+        knownDevices["Camera"]?.clear()
+        knownDevices["Camera"]?.addAll(cameras)
+
+        knownDevices["Sensor"]?.clear()
+        knownDevices["Sensor"]?.addAll(sensors)
+
+        _schedules.clear()
+        _schedules.addAll(newSchedules)
+    }
+
+    // NEW FUNCTION: Clear all devices
+    fun clearAllDevices() {
+        knownDevices.values.forEach { it.clear() }
+        _schedules.clear()
+    }
+
+    // NEW FUNCTION: Remove a schedule
+    fun removeSchedule(schedule: String) {
+        _schedules.remove(schedule)
+    }
 }
