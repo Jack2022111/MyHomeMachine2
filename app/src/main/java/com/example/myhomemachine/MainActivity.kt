@@ -206,6 +206,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import androidx.core.app.NotificationCompat
 
+import android.app.PendingIntent
+import androidx.core.app.NotificationManagerCompat
+
 
 // lifx stuff super unsecure
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
@@ -251,12 +254,23 @@ class MainActivity : AppCompatActivity() {
     private var lastColor: String = "hue:0 saturation:0 brightness:1" // Default color (White)
     private var currentBrightness: Float = 0.8f // Default brightness (80%)
 
+    private val channelId = "i.apps.notifications" // Unique channel ID for notifications
+    private val description = "Test notification"  // Description for the notification channel
+    private val notificationId = 1234 // Unique identifier for the notification
+    private  val CHANNEL_ID = "my_channel_id"
 
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         checkAndRequestPermissions()
+        createNotificationChannel()
+        sendNotification("Welcome to My Home", "Notification is working")
+        /**
+         * Create a notification channel for devices running Android 8.0 or higher.
+         * A channel groups notifications with similar behavior.
+         */
+
 
         val sharedViewModel: SharedViewModel by viewModels()
         sharedViewModel.initialize(this)
@@ -279,6 +293,41 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+
+    private fun createNotificationChannel() {
+        // Notification channels are required on Android 8.0+ (API level 26+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "My Notification Channel"
+            val descriptionText = "This channel is used for demo notifications"
+            val importance = NotificationManager.IMPORTANCE_DEFAULT
+
+            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+            }
+
+            // Register the channel with the system
+            val notificationManager = getSystemService(NotificationManager::class.java)
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun sendNotification(Title: String,Text: String) {
+        // Build the notification
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(Title)
+            .setContentText(Text)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+
+        // Show the notification
+        with(NotificationManagerCompat.from(this)) {
+            // Unique ID for the notification
+            notify(1, builder.build())
+        }
+    }
+
+
 
     // ✅ Fetch Temperature from SwitchBot API
     /*
@@ -317,42 +366,42 @@ class MainActivity : AppCompatActivity() {
     }
 
      */
-/*
-    suspend fun fetchTemperature(): Double? {
-        val timestamp = System.currentTimeMillis().toString()
-        val nonce = UUID.randomUUID().toString()
-        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
+    /*
+        suspend fun fetchTemperature(): Double? {
+            val timestamp = System.currentTimeMillis().toString()
+            val nonce = UUID.randomUUID().toString()
+            val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
 
-        val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(OkHttpClient.Builder().build())
-            .build()
+            val retrofit = Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .addConverterFactory(GsonConverterFactory.create())
+                .client(OkHttpClient.Builder().build())
+                .build()
 
-        val apiService = retrofit.create(SwitchBotApiService::class.java)
+            val apiService = retrofit.create(SwitchBotApiService::class.java)
 
-        return try {
-            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
-            if (response.isSuccessful) {
-                response.body()?.body?.temperature?.toDouble() // ✅ Convert Float to Double
-            } else {
-                Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
+            return try {
+                val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
+                if (response.isSuccessful) {
+                    response.body()?.body?.temperature?.toDouble() // ✅ Convert Float to Double
+                } else {
+                    Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e("SwitchBot", "Failed to fetch temperature", e)
                 null
             }
-        } catch (e: Exception) {
-            Log.e("SwitchBot", "Failed to fetch temperature", e)
-            null
         }
-    }
 
-    private fun generateSignature(token: String, secret: String, timestamp: String, nonce: String): String {
-        val data = token + timestamp + nonce
-        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-        mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
-        return android.util.Base64.encodeToString(mac.doFinal(data.toByteArray()), android.util.Base64.NO_WRAP)
-    }
+        private fun generateSignature(token: String, secret: String, timestamp: String, nonce: String): String {
+            val data = token + timestamp + nonce
+            val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+            mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
+            return android.util.Base64.encodeToString(mac.doFinal(data.toByteArray()), android.util.Base64.NO_WRAP)
+        }
 
- */
+     */
 
 
     private fun turnLightOn() {
@@ -368,6 +417,8 @@ class MainActivity : AppCompatActivity() {
                 )
                 isLightOn = true
                 Log.d("LIFX", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
+                sendNotification("Light Devices", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
+
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light on", e)
             }
@@ -387,6 +438,8 @@ class MainActivity : AppCompatActivity() {
                 )
                 isLightOn = false // ✅ Make sure this updates correctly
                 Log.d("LIFX", "Light turned OFF")
+                sendNotification("Light Devices", "Light turned OFF")
+
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
             }
