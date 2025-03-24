@@ -18,18 +18,68 @@ class PersistentDeviceManager(context: Context) {
 
     companion object {
         private const val PREF_NAME = "device_prefs"
-        private const val KEY_LIGHTS = "lights"
-        private const val KEY_PLUGS = "plugs"
-        private const val KEY_CAMERAS = "cameras"
-        private const val KEY_SENSORS = "sensors"
-        private const val KEY_SCHEDULES = "schedules"
-        private const val KEY_USER_EMAIL = "user_email"
+        private const val KEY_USER_PREFIX = "user_"
+        private const val KEY_LIGHTS_SUFFIX = "_lights"
+        private const val KEY_PLUGS_SUFFIX = "_plugs"
+        private const val KEY_CAMERAS_SUFFIX = "_cameras"
+        private const val KEY_SENSORS_SUFFIX = "_sensors"
+        private const val KEY_SCHEDULES_SUFFIX = "_schedules"
+        private const val KEY_CURRENT_USER = "current_user_id"
+    }
 
-        // Static access to existing device lists from the original DeviceManager
-        // for backward compatibility during the transition
-        fun migrateDevices(context: Context) {
-            val persistentDeviceManager = PersistentDeviceManager(context)
-            persistentDeviceManager.saveDevices(
+    /**
+     * Get the current user's email from SharedPreferences
+     */
+    private fun getCurrentUser(): String {
+        return sharedPreferences.getString(KEY_CURRENT_USER, "") ?: ""
+    }
+
+    /**
+     * Set the current user in SharedPreferences
+     */
+    private fun setCurrentUser(userEmail: String) {
+        val editor = sharedPreferences.edit()
+        editor.putString(KEY_CURRENT_USER, userEmail)
+        editor.apply()
+    }
+
+    /**
+     * Generate key for user-specific device storage
+     */
+    private fun getUserKey(userEmail: String, suffix: String): String {
+        return KEY_USER_PREFIX + userEmail.replace("@", "_at_").replace(".", "_dot_") + suffix
+    }
+
+    /**
+     * Save devices for a specific user
+     */
+    fun saveDevicesForUser(
+        userEmail: String,
+        lights: List<String>,
+        plugs: List<String>,
+        cameras: List<String>,
+        sensors: List<String>,
+        schedules: List<String>
+    ) {
+        setCurrentUser(userEmail)
+
+        val editor = sharedPreferences.edit()
+        editor.putString(getUserKey(userEmail, KEY_LIGHTS_SUFFIX), gson.toJson(lights))
+        editor.putString(getUserKey(userEmail, KEY_PLUGS_SUFFIX), gson.toJson(plugs))
+        editor.putString(getUserKey(userEmail, KEY_CAMERAS_SUFFIX), gson.toJson(cameras))
+        editor.putString(getUserKey(userEmail, KEY_SENSORS_SUFFIX), gson.toJson(sensors))
+        editor.putString(getUserKey(userEmail, KEY_SCHEDULES_SUFFIX), gson.toJson(schedules))
+        editor.apply()
+    }
+
+    /**
+     * Save current devices for the logged-in user
+     */
+    fun saveCurrentUserDevices() {
+        val userEmail = getCurrentUser()
+        if (userEmail.isNotEmpty()) {
+            saveDevicesForUser(
+                userEmail,
                 DeviceManager.knownLights,
                 DeviceManager.knownPlugs,
                 DeviceManager.knownCameras,
@@ -40,57 +90,33 @@ class PersistentDeviceManager(context: Context) {
     }
 
     /**
-     * Save devices for the current user
+     * Load devices for a specific user
      */
-    fun saveDevices(
-        lights: List<String>,
-        plugs: List<String>,
-        cameras: List<String>,
-        sensors: List<String>,
-        schedules: List<String>
-    ) {
-        val editor = sharedPreferences.edit()
-        editor.putString(KEY_LIGHTS, gson.toJson(lights))
-        editor.putString(KEY_PLUGS, gson.toJson(plugs))
-        editor.putString(KEY_CAMERAS, gson.toJson(cameras))
-        editor.putString(KEY_SENSORS, gson.toJson(sensors))
-        editor.putString(KEY_SCHEDULES, gson.toJson(schedules))
-        editor.apply()
-    }
+    fun loadDevicesForUser(userEmail: String) {
+        setCurrentUser(userEmail)
 
-    /**
-     * Save devices specifically for a user (for multi-user support)
-     */
-    fun saveDevicesForUser(
-        userEmail: String,
-        lights: List<String>,
-        plugs: List<String>,
-        cameras: List<String>,
-        sensors: List<String>,
-        schedules: List<String>
-    ) {
-        val editor = sharedPreferences.edit()
+        // First, clear all existing devices
+        DeviceManager.clearAllDevices()
 
-        // Store the current user email
-        editor.putString(KEY_USER_EMAIL, userEmail)
+        if (userEmail.isEmpty()) {
+            return
+        }
 
-        // Store devices for the user
-        saveDevices(lights, plugs, cameras, sensors, schedules)
-        editor.apply()
-    }
-
-    /**
-     * Load devices for the current user
-     */
-    fun loadDevices() {
-        // Load devices from SharedPreferences
         val typeToken = object : TypeToken<List<String>>() {}.type
 
-        val lightsJson = sharedPreferences.getString(KEY_LIGHTS, "[]") ?: "[]"
-        val plugsJson = sharedPreferences.getString(KEY_PLUGS, "[]") ?: "[]"
-        val camerasJson = sharedPreferences.getString(KEY_CAMERAS, "[]") ?: "[]"
-        val sensorsJson = sharedPreferences.getString(KEY_SENSORS, "[]") ?: "[]"
-        val schedulesJson = sharedPreferences.getString(KEY_SCHEDULES, "[]") ?: "[]"
+        // Get user-specific keys
+        val lightsKey = getUserKey(userEmail, KEY_LIGHTS_SUFFIX)
+        val plugsKey = getUserKey(userEmail, KEY_PLUGS_SUFFIX)
+        val camerasKey = getUserKey(userEmail, KEY_CAMERAS_SUFFIX)
+        val sensorsKey = getUserKey(userEmail, KEY_SENSORS_SUFFIX)
+        val schedulesKey = getUserKey(userEmail, KEY_SCHEDULES_SUFFIX)
+
+        // Load the device lists from SharedPreferences
+        val lightsJson = sharedPreferences.getString(lightsKey, "[]") ?: "[]"
+        val plugsJson = sharedPreferences.getString(plugsKey, "[]") ?: "[]"
+        val camerasJson = sharedPreferences.getString(camerasKey, "[]") ?: "[]"
+        val sensorsJson = sharedPreferences.getString(sensorsKey, "[]") ?: "[]"
+        val schedulesJson = sharedPreferences.getString(schedulesKey, "[]") ?: "[]"
 
         // Parse the JSON data
         val lights: List<String> = gson.fromJson(lightsJson, typeToken)
@@ -99,87 +125,70 @@ class PersistentDeviceManager(context: Context) {
         val sensors: List<String> = gson.fromJson(sensorsJson, typeToken)
         val schedules: List<String> = gson.fromJson(schedulesJson, typeToken)
 
-        // Update the static DeviceManager using the new updateAllDevices method
+        // Update the DeviceManager with the user's devices
         DeviceManager.updateAllDevices(lights, plugs, cameras, sensors, schedules)
     }
 
     /**
-     * Add a new device and save to persistent storage
+     * For backward compatibility
+     */
+    fun loadDevices() {
+        val userEmail = getCurrentUser()
+        if (userEmail.isNotEmpty()) {
+            loadDevicesForUser(userEmail)
+        }
+    }
+
+    /**
+     * Add a device for the current user
      */
     fun addDevice(name: String, type: String) {
-        // Add the device to the DeviceManager
+        // Add the device to the in-memory DeviceManager
         DeviceManager.addDevice(name, type)
 
-        // Save the updated device lists to persistent storage
-        saveDevices(
-            DeviceManager.knownLights,
-            DeviceManager.knownPlugs,
-            DeviceManager.knownCameras,
-            DeviceManager.knownSensors,
-            DeviceManager.schedules
-        )
+        // Save the updated devices for the current user
+        saveCurrentUserDevices()
     }
 
     /**
-     * Add a schedule and save to persistent storage
-     */
-    fun addSchedule(schedule: String) {
-        // Add the schedule to the DeviceManager
-        DeviceManager.addSchedule(schedule)
-
-        // Save the updated schedules to persistent storage
-        saveDevices(
-            DeviceManager.knownLights,
-            DeviceManager.knownPlugs,
-            DeviceManager.knownCameras,
-            DeviceManager.knownSensors,
-            DeviceManager.schedules
-        )
-    }
-
-    /**
-     * Clear all devices for the current user
-     */
-    fun clearDevices() {
-        // Clear the SharedPreferences
-        val editor = sharedPreferences.edit()
-        editor.clear()
-        editor.apply()
-
-        // Clear the DeviceManager
-        DeviceManager.clearAllDevices()
-    }
-    /**
-     * Remove a device and update persistent storage
+     * Remove a device for the current user
      */
     fun removeDevice(name: String, type: String) {
-        // Remove the device from the DeviceManager
+        // Remove the device from the in-memory DeviceManager
         DeviceManager.removeDevice(name, type)
 
-        // Save the updated device lists to persistent storage
-        saveDevices(
-            DeviceManager.knownLights,
-            DeviceManager.knownPlugs,
-            DeviceManager.knownCameras,
-            DeviceManager.knownSensors,
-            DeviceManager.schedules
-        )
+        // Save the updated devices for the current user
+        saveCurrentUserDevices()
     }
 
     /**
-     * Remove a schedule and update persistent storage
+     * Add a schedule for the current user
+     */
+    fun addSchedule(schedule: String) {
+        // Add the schedule to the in-memory DeviceManager
+        DeviceManager.addSchedule(schedule)
+
+        // Save the updated schedules for the current user
+        saveCurrentUserDevices()
+    }
+
+    /**
+     * Remove a schedule for the current user
      */
     fun removeSchedule(schedule: String) {
-        // Remove the schedule from the DeviceManager
+        // Remove the schedule from the in-memory DeviceManager
         DeviceManager.removeSchedule(schedule)
 
-        // Save the updated schedules to persistent storage
-        saveDevices(
-            DeviceManager.knownLights,
-            DeviceManager.knownPlugs,
-            DeviceManager.knownCameras,
-            DeviceManager.knownSensors,
-            DeviceManager.schedules
-        )
+        // Save the updated schedules for the current user
+        saveCurrentUserDevices()
+    }
+
+    /**
+     * Clear devices for the current user
+     */
+    fun clearCurrentUserDevices() {
+        DeviceManager.clearAllDevices()
+        val userEmail = getCurrentUser()
+        setCurrentUser("")
     }
 }

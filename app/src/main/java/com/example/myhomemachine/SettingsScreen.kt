@@ -352,7 +352,13 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        // Use SessionManager for proper logout
+                        // Save current user's devices before logout
+                        deviceManager.saveCurrentUserDevices()
+
+                        // Clear devices from memory
+                        deviceManager.clearCurrentUserDevices()
+
+                        // Perform logout in SessionManager
                         sessionManager.logoutUser()
                         showLogoutDialog = false
 

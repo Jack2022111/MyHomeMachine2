@@ -276,7 +276,11 @@ class MainActivity : AppCompatActivity() {
 
         // Load devices from persistent storage if user is logged in
         if (sessionManager.isLoggedIn()) {
-            deviceManager.loadDevices()
+            val userDetails = sessionManager.getUserDetails()
+            val userEmail = userDetails[SessionManager.KEY_USER_EMAIL] ?: ""
+            if (userEmail.isNotEmpty()) {
+                deviceManager.loadDevicesForUser(userEmail)
+            }
         }
 
         val sharedViewModel: SharedViewModel by viewModels()
@@ -1837,9 +1841,9 @@ fun LoginScreen(navController: NavHostController) {
                 // Create a login session with "Remember Me" preference
                 sessionManager.createLoginSession(userId, email, rememberMe)
 
-                // Load user's devices from persistent storage
+                // Load this user's specific devices from persistent storage
                 val deviceManager = PersistentDeviceManager(context)
-                deviceManager.loadDevices()
+                deviceManager.loadDevicesForUser(email)
 
                 // Navigate to home screen on successful login
                 navController.navigate("home") {

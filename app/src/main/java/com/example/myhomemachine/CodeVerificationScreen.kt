@@ -290,7 +290,7 @@ fun CodeVerificationScreen(
 
                         // Use deleteUserAccount instead of logoutUser
                         localSessionManager.deleteUserAccount()
-                        localDeviceManager.clearDevices()
+                        localDeviceManager.clearCurrentUserDevices()
                         Log.d("CodeVerificationScreen", "User data cleared")
 
                         navController.navigate("first") {
