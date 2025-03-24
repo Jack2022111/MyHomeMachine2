@@ -4,12 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import android.util.Log
 
 /**
  * PersistentDeviceManager handles storing and retrieving device information
  * using SharedPreferences for persistence across app sessions
  */
-class PersistentDeviceManager(context: Context) {
+class PersistentDeviceManager(val context: Context) {
 
     private val sharedPreferences: SharedPreferences = context.getSharedPreferences(
         PREF_NAME, Context.MODE_PRIVATE
@@ -188,7 +189,36 @@ class PersistentDeviceManager(context: Context) {
      */
     fun clearCurrentUserDevices() {
         DeviceManager.clearAllDevices()
-        val userEmail = getCurrentUser()
         setCurrentUser("")
+    }
+
+    /**
+     * Save a schedule - this is just an alias for addSchedule for compatibility
+     */
+    fun saveSchedule(schedule: String) {
+        addSchedule(schedule)
+    }
+
+    /**
+     * This implements the previously missing loadSchedules() method that was crashing the app
+     */
+    fun loadSchedules() {
+        val userEmail = getCurrentUser()
+        if (userEmail.isEmpty()) {
+            Log.d("PersistentDeviceManager", "No current user, cannot load schedules")
+            return
+        }
+
+        val schedulesKey = getUserKey(userEmail, KEY_SCHEDULES_SUFFIX)
+        val schedulesJson = sharedPreferences.getString(schedulesKey, "[]") ?: "[]"
+
+        val typeToken = object : TypeToken<List<String>>() {}.type
+        val schedules: List<String> = gson.fromJson(schedulesJson, typeToken)
+
+        // Update the DeviceManager with the user's schedules
+        // Don't access schedules directly - use the provided method
+        DeviceManager.updateSchedules(schedules)
+
+        Log.d("PersistentDeviceManager", "Loaded ${schedules.size} schedules for user $userEmail")
     }
 }

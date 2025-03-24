@@ -211,7 +211,30 @@ import androidx.core.app.NotificationCompat
 import androidx.compose.ui.platform.LocalContext
 import android.app.PendingIntent
 import androidx.core.app.NotificationManagerCompat
+import android.content.BroadcastReceiver
 
+import android.content.IntentFilter
+import com.example.myhomemachine.service.ScheduleService
+import com.example.myhomemachine.data.Schedule
+import java.time.DayOfWeek
+import java.time.LocalTime
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.RadioButton
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.CircleShape
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
 
 // lifx stuff super unsecure
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
@@ -228,6 +251,11 @@ data class SwitchBotResponse(
     val body: DeviceStatus,
     val message: String
 )
+fun String.capitalize(): String {
+    return this.lowercase().replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase() else it.toString()
+    }
+}
 
 data class DeviceStatus(
     val deviceId: String,
@@ -336,6 +364,90 @@ class MainActivity : AppCompatActivity() {
         with(NotificationManagerCompat.from(this)) {
             // Unique ID for the notification
             notify(1, builder.build())
+        }
+    }
+
+    private val scheduleReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == "com.example.myhomemachine.EXECUTE_SCHEDULE") {
+                val deviceType = intent.getStringExtra("deviceType") ?: return
+                val action = intent.getStringExtra("action") ?: return
+
+                when (deviceType) {
+                    "Light" -> {
+                        if (action == "ON") {
+                            turnLightOn()
+                            sendNotification("Schedule", "Light turned ON")
+                        } else if (action == "OFF") {
+                            turnLightOff()
+                            sendNotification("Schedule", "Light turned OFF")
+                        }
+                    }
+                    "Plug" -> {
+                        val deviceController = DeviceController()
+                        if (action == "ON") {
+                            deviceController.turnOnPlug()
+                            sendNotification("Schedule", "Plug turned ON")
+                        } else if (action == "OFF") {
+                            deviceController.turnOffPlug()
+                            sendNotification("Schedule", "Plug turned OFF")
+                        }
+                    }
+                    // Add other device types as needed
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        try {
+            // Unregister broadcast receiver
+            unregisterReceiver(scheduleReceiver)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error unregistering receiver: ${e.message}")
+        }
+        super.onDestroy()
+    }
+
+    private fun executeScheduledAction(deviceName: String, deviceType: String, action: String, value: String) {
+        when (deviceType) {
+            "Light" -> {
+                when (action) {
+                    "ON" -> turnLightOn()
+                    "OFF" -> turnLightOff()
+                    "SET_BRIGHTNESS" -> {
+                        val brightness = value.toFloatOrNull() ?: 0.8f
+                        setBrightness(brightness / 100f) // Convert percentage to 0-1 range
+                    }
+                    "SET_COLOR" -> {
+                        try {
+                            // Parse hex color code
+                            val colorInt = android.graphics.Color.parseColor(value)
+                            val color = Color(colorInt)
+                            setColor(color)
+                        } catch (e: Exception) {
+                            Log.e("MainActivity", "Error parsing color for schedule: $e")
+                        }
+                    }
+                }
+                sendNotification("Light Schedule", "Executed $action for $deviceName")
+            }
+            "Plug" -> {
+                val deviceController = DeviceController()
+                when (action) {
+                    "ON" -> deviceController.turnOnPlug()
+                    "OFF" -> deviceController.turnOffPlug()
+                }
+                sendNotification("Plug Schedule", "Executed $action for $deviceName")
+            }
+            "Camera" -> {
+                // Add camera actions here
+                sendNotification("Camera Schedule", "Executed $action for $deviceName")
+            }
+            "Sensor" -> {
+                // Add sensor actions here
+                sendNotification("Sensor Schedule", "Executed $action for $deviceName")
+            }
         }
     }
 
@@ -2697,8 +2809,25 @@ fun LightsScreen(
         )
     }
 
-    if (showScheduleDialog) {
-        EnhancedScheduleDialog(onDismiss = { showScheduleDialog = false })
+
+    // Show schedule dialog
+    if (showScheduleDialog && selectedLight != null) {
+        EnhancedScheduleDialog(
+            onDismiss = { showScheduleDialog = false },
+            deviceName = selectedLight!!,  // Pass the selected light name
+            deviceType = "Light",          // Set device type as "Light"
+            onSaveSchedule = { scheduleString ->
+                try {
+                    deviceManager.saveSchedule(scheduleString)
+                    // Show confirmation
+                    Toast.makeText(context, "Schedule saved", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e("LightsScreen", "Error saving schedule: ${e.message}", e)
+                    // Show error
+                    Toast.makeText(context, "Failed to save schedule", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
     }
 
     if (showConfirmation) {
@@ -3108,34 +3237,6 @@ private fun ActionButtons(
             Text("Save")
         }
     }
-}
-
-@Composable
-private fun EnhancedScheduleDialog(onDismiss: () -> Unit) {
-    var selectedTime by remember { mutableStateOf("") }
-    var selectedDays by remember { mutableStateOf(setOf<String>()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Set Schedule") },
-        text = {
-            Column {
-                Text("Select time and days for the schedule")
-                // Add time picker and day selection here
-                // This is a placeholder for later milestone- you would want to add actual time/day selection UI
-            }
-        },
-        confirmButton = {
-            Button(onClick = onDismiss) {
-                Text("Confirm")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
 }
 
 // Plugs section
@@ -4010,12 +4111,27 @@ fun AirQualityDisplay(airQualityHistory: List<Int>) {
         }
     }
 }
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulePage(navController: NavHostController) {
     val context = LocalContext.current
     val deviceManager = remember { PersistentDeviceManager(context) }
     var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
+    var showScheduleDialog by remember { mutableStateOf(false) }
+
+    // State for loading indicator
+    var isLoading by remember { mutableStateOf(true) }
+
+    // Load schedules when the screen is displayed
+    LaunchedEffect(Unit) {
+        try {
+            deviceManager.loadSchedules()
+            isLoading = false
+        } catch (e: Exception) {
+            Log.e("SchedulePage", "Error loading schedules: ${e.message}", e)
+            isLoading = false
+        }
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -4024,92 +4140,118 @@ fun SchedulePage(navController: NavHostController) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top section with back button and title
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 32.dp),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { navController.navigateUp() }) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back"
-                    )
-                }
-                Text(
-                    text = "Device Schedules",
-                    style = MaterialTheme.typography.headlineMedium,
-                    modifier = Modifier.padding(start = 8.dp)
+            // Top bar with back button and title
+            TopAppBar(
+                title = { Text("Device Schedules") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
-            }
+            )
 
-            // Schedule display card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Column(
+            // Loading indicator
+            if (isLoading) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                // Schedule list
+                Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .weight(1f),
+                    elevation = CardDefaults.cardElevation(
+                        defaultElevation = 4.dp
+                    )
                 ) {
-                    if (DeviceManager.schedules.isEmpty()) {
-                        // Message for no schedules
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp)
+                    ) {
                         Text(
-                            text = "No current schedules available.",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            text = "Current Schedules",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
-                    } else {
-                        // Display each schedule
-                        DeviceManager.schedules.forEach { schedule ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = schedule,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.weight(1f)
-                                )
 
-                                IconButton(onClick = { showDeleteConfirmation = schedule }) {
+                        if (DeviceManager.schedules.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
                                     Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete Schedule",
-                                        tint = MaterialTheme.colorScheme.error
+                                        imageVector = Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(64.dp),
+                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "No schedules found",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Tap the + button below to create one",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                                     )
                                 }
                             }
-                            Spacer(modifier = Modifier.height(8.dp))
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(DeviceManager.schedules) { schedule ->
+                                    ScheduleItem(
+                                        schedule = schedule,
+                                        onDelete = { showDeleteConfirmation = schedule }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Back button at the bottom
-            Button(
-                onClick = { navController.navigate("home") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Text("Back")
+                // Add new schedule button
+                FloatingActionButton(
+                    onClick = { showScheduleDialog = true },
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .padding(16.dp),
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = "Add Schedule",
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
             }
         }
     }
@@ -4119,12 +4261,26 @@ fun SchedulePage(navController: NavHostController) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = null },
             title = { Text("Delete Schedule") },
-            text = { Text("Are you sure you want to remove this schedule?") },
+            text = {
+                Column {
+                    Text("Are you sure you want to delete this schedule?")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = schedule,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
-                        deviceManager.removeSchedule(schedule)
-                        showDeleteConfirmation = null
+                        try {
+                            deviceManager.removeSchedule(schedule)
+                            showDeleteConfirmation = null
+                        } catch (e: Exception) {
+                            Log.e("SchedulePage", "Error removing schedule: ${e.message}", e)
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error
@@ -4134,13 +4290,967 @@ fun SchedulePage(navController: NavHostController) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = null }) {
+                OutlinedButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Show schedule creation dialog
+    if (showScheduleDialog) {
+        EnhancedScheduleDialog(
+            onDismiss = { showScheduleDialog = false },
+            // Leave deviceName and deviceType as defaults since user will select in dialog
+            onSaveSchedule = { scheduleString ->
+                try {
+                    deviceManager.saveSchedule(scheduleString)
+                    // Optional: Show a toast confirmation
+                    Toast.makeText(context, "Schedule created", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e("SchedulePage", "Error saving schedule: ${e.message}", e)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun ScheduleItem(
+    schedule: String,
+    onDelete: () -> Unit
+) {
+    val deviceType = when {
+        schedule.contains("(Light)") -> "Light"
+        schedule.contains("(Plug)") -> "Plug"
+        schedule.contains("(Camera)") -> "Camera"
+        schedule.contains("(Sensor)") -> "Sensor"
+        else -> ""
+    }
+
+    val deviceIcon = when(deviceType) {
+        "Light" -> Icons.Default.Lightbulb
+        "Plug" -> Icons.Default.PowerSettingsNew
+        "Camera" -> Icons.Default.Videocam
+        "Sensor" -> Icons.Default.Sensors
+        else -> Icons.Default.Devices
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Icon representing the device type
+            Icon(
+                imageVector = deviceIcon,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .padding(end = 8.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            // Schedule description
+            Text(
+                text = schedule,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f)
+            )
+
+            // Delete button
+            IconButton(
+                onClick = onDelete
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Schedule",
+                    tint = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EnhancedScheduleDialog(
+    onDismiss: () -> Unit,
+    deviceName: String = "",
+    deviceType: String = "Light",
+    onSaveSchedule: (String) -> Unit = {}
+) {
+    // Device type and lists
+    var selectedDeviceType by remember { mutableStateOf(deviceType) }
+    var devicesList by remember { mutableStateOf<List<String>>(emptyList()) }
+    var selectedDevice by remember { mutableStateOf(deviceName) }
+
+    // Time selection
+    var selectedHour by remember { mutableStateOf(8) }
+    var selectedMinute by remember { mutableStateOf(0) }
+    var selectedAmPm by remember { mutableStateOf("AM") }
+
+    // Action selection
+    var selectedAction by remember { mutableStateOf("ON") }
+    var actionsList by remember { mutableStateOf<List<String>>(listOf("ON", "OFF")) }
+
+    // Color selection for lights
+    var selectedColor by remember { mutableStateOf(Color.White) }
+    var showColorPicker by remember { mutableStateOf(false) }
+
+    // Brightness for lights
+    var brightness by remember { mutableStateOf(80f) }
+
+    // Days selection
+    var selectedDays by remember { mutableStateOf(setOf("MON", "TUE", "WED", "THU", "FRI")) }
+
+    // Error handling
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // UI state
+    var deviceTypeExpanded by remember { mutableStateOf(false) }
+    var deviceListExpanded by remember { mutableStateOf(false) }
+    var hourExpanded by remember { mutableStateOf(false) }
+    var minuteExpanded by remember { mutableStateOf(false) }
+    var amPmExpanded by remember { mutableStateOf(false) }
+    var actionExpanded by remember { mutableStateOf(false) }
+
+    // Color picker state - use regular mutableStateOf instead of mutableFloatStateOf
+    var red by remember { mutableStateOf(selectedColor.red) }
+    var green by remember { mutableStateOf(selectedColor.green) }
+    var blue by remember { mutableStateOf(selectedColor.blue) }
+
+    // Load device lists based on type
+    LaunchedEffect(selectedDeviceType) {
+        devicesList = when (selectedDeviceType) {
+            "Light" -> DeviceManager.knownLights
+            "Plug" -> DeviceManager.knownPlugs
+            "Camera" -> DeviceManager.knownCameras
+            "Sensor" -> DeviceManager.knownSensors
+            else -> emptyList()
+        }
+
+        // Update available actions based on device type
+        actionsList = when (selectedDeviceType) {
+            "Light" -> listOf("ON", "OFF", "SET_COLOR", "SET_BRIGHTNESS")
+            "Plug" -> listOf("ON", "OFF")
+            "Camera" -> listOf("ON", "OFF", "CAPTURE")
+            "Sensor" -> listOf("ALERT_ON", "ALERT_OFF", "CHECK")
+            else -> listOf("ON", "OFF")
+        }
+
+        // If no device is selected and list isn't empty, select the first one
+        if (selectedDevice.isEmpty() && devicesList.isNotEmpty()) {
+            selectedDevice = devicesList.first()
+        }
+
+        // Reset to ON if current action is not valid for this device type
+        if (selectedAction !in actionsList) {
+            selectedAction = actionsList.first()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Create Schedule",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Device Type Selection
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "1. Select Device Type",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        ExposedDropdownMenuBox(
+                            expanded = deviceTypeExpanded,
+                            onExpandedChange = { deviceTypeExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = selectedDeviceType,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Device Type") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when(selectedDeviceType) {
+                                            "Light" -> Icons.Default.Lightbulb
+                                            "Plug" -> Icons.Default.PowerSettingsNew
+                                            "Camera" -> Icons.Default.Videocam
+                                            "Sensor" -> Icons.Default.Sensors
+                                            else -> Icons.Default.Settings
+                                        },
+                                        contentDescription = null
+                                    )
+                                },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = deviceTypeExpanded)
+                                },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
+                            )
+
+                            ExposedDropdownMenu(
+                                expanded = deviceTypeExpanded,
+                                onDismissRequest = { deviceTypeExpanded = false }
+                            ) {
+                                listOf("Light", "Plug", "Camera", "Sensor").forEach { type ->
+                                    DropdownMenuItem(
+                                        text = { Text(type) },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = when(type) {
+                                                    "Light" -> Icons.Default.Lightbulb
+                                                    "Plug" -> Icons.Default.PowerSettingsNew
+                                                    "Camera" -> Icons.Default.Videocam
+                                                    "Sensor" -> Icons.Default.Sensors
+                                                    else -> Icons.Default.Settings
+                                                },
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            selectedDeviceType = type
+                                            deviceTypeExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Device Selection
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "2. Select Device",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        if (devicesList.isEmpty()) {
+                            Text(
+                                text = "No ${selectedDeviceType.lowercase()} devices available. Please add a device first.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        } else {
+                            ExposedDropdownMenuBox(
+                                expanded = deviceListExpanded,
+                                onExpandedChange = { deviceListExpanded = it }
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedDevice,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Select Device") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = deviceListExpanded)
+                                    },
+                                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .menuAnchor()
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = deviceListExpanded,
+                                    onDismissRequest = { deviceListExpanded = false }
+                                ) {
+                                    devicesList.forEach { device ->
+                                        DropdownMenuItem(
+                                            text = { Text(device) },
+                                            onClick = {
+                                                selectedDevice = device
+                                                deviceListExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Time Selection
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "3. Set Time",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Hour selection
+                            ExposedDropdownMenuBox(
+                                expanded = hourExpanded,
+                                onExpandedChange = { hourExpanded = it },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedHour.toString(),
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Hour") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = hourExpanded)
+                                    },
+                                    modifier = Modifier.menuAnchor()
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = hourExpanded,
+                                    onDismissRequest = { hourExpanded = false }
+                                ) {
+                                    (1..12).forEach { hour ->
+                                        DropdownMenuItem(
+                                            text = { Text(hour.toString()) },
+                                            onClick = {
+                                                selectedHour = hour
+                                                hourExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Minute selection
+                            ExposedDropdownMenuBox(
+                                expanded = minuteExpanded,
+                                onExpandedChange = { minuteExpanded = it },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                OutlinedTextField(
+                                    value = String.format("%02d", selectedMinute),
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Minute") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = minuteExpanded)
+                                    },
+                                    modifier = Modifier.menuAnchor()
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = minuteExpanded,
+                                    onDismissRequest = { minuteExpanded = false }
+                                ) {
+                                    // Allow selection of any minute 0-59
+                                    (0..59).forEach { minute ->
+                                        DropdownMenuItem(
+                                            text = { Text(String.format("%02d", minute)) },
+                                            onClick = {
+                                                selectedMinute = minute
+                                                minuteExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // AM/PM selection
+                            ExposedDropdownMenuBox(
+                                expanded = amPmExpanded,
+                                onExpandedChange = { amPmExpanded = it },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                OutlinedTextField(
+                                    value = selectedAmPm,
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("AM/PM") },
+                                    trailingIcon = {
+                                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = amPmExpanded)
+                                    },
+                                    modifier = Modifier.menuAnchor()
+                                )
+
+                                ExposedDropdownMenu(
+                                    expanded = amPmExpanded,
+                                    onDismissRequest = { amPmExpanded = false }
+                                ) {
+                                    listOf("AM", "PM").forEach { period ->
+                                        DropdownMenuItem(
+                                            text = { Text(period) },
+                                            onClick = {
+                                                selectedAmPm = period
+                                                amPmExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // Display selected time
+                        Text(
+                            text = "Selected time: ${selectedHour}:${String.format("%02d", selectedMinute)} ${selectedAmPm}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                    }
+                }
+
+                // Days Selection
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "4. Select Days",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        // Quick selection buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Button(
+                                onClick = {
+                                    selectedDays = setOf("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
+                                },
+                                modifier = Modifier.weight(1f).padding(end = 4.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selectedDays.size == 7)
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Text("Every Day")
+                            }
+
+                            Button(
+                                onClick = {
+                                    selectedDays = setOf("MON", "TUE", "WED", "THU", "FRI")
+                                },
+                                modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selectedDays == setOf("MON", "TUE", "WED", "THU", "FRI"))
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Text("Weekdays")
+                            }
+
+                            Button(
+                                onClick = {
+                                    selectedDays = setOf("SAT", "SUN")
+                                },
+                                modifier = Modifier.weight(1f).padding(start = 4.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selectedDays == setOf("SAT", "SUN"))
+                                        MaterialTheme.colorScheme.primary
+                                    else
+                                        MaterialTheme.colorScheme.secondary
+                                )
+                            ) {
+                                Text("Weekend")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Individual day checkboxes
+                        val dayMap = listOf(
+                            "MON" to "Monday",
+                            "TUE" to "Tuesday",
+                            "WED" to "Wednesday",
+                            "THU" to "Thursday",
+                            "FRI" to "Friday",
+                            "SAT" to "Saturday",
+                            "SUN" to "Sunday"
+                        )
+
+                        Column {
+                            dayMap.forEach { (code, name) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Checkbox(
+                                        checked = selectedDays.contains(code),
+                                        onCheckedChange = { isChecked ->
+                                            selectedDays = if (isChecked) {
+                                                selectedDays + code
+                                            } else {
+                                                selectedDays - code
+                                            }
+                                        }
+                                    )
+                                    Text(
+                                        text = name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        modifier = Modifier.padding(start = 8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Action Selection
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "5. Select Action",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        ExposedDropdownMenuBox(
+                            expanded = actionExpanded,
+                            onExpandedChange = { actionExpanded = it }
+                        ) {
+                            OutlinedTextField(
+                                value = when(selectedAction) {
+                                    "ON" -> "Turn On"
+                                    "OFF" -> "Turn Off"
+                                    "SET_COLOR" -> "Set Color"
+                                    "SET_BRIGHTNESS" -> "Set Brightness"
+                                    "CAPTURE" -> "Capture Image"
+                                    "ALERT_ON" -> "Enable Alerts"
+                                    "ALERT_OFF" -> "Disable Alerts"
+                                    "CHECK" -> "Check Status"
+                                    else -> selectedAction
+                                },
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("Action") },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = when(selectedAction) {
+                                            "ON" -> Icons.Default.PowerSettingsNew
+                                            "OFF" -> Icons.Default.Power
+                                            "SET_COLOR" -> Icons.Default.Palette
+                                            "SET_BRIGHTNESS" -> Icons.Default.LightMode
+                                            "CAPTURE" -> Icons.Default.Videocam
+                                            "ALERT_ON", "ALERT_OFF", "CHECK" -> Icons.Default.Sensors
+                                            else -> Icons.Default.Settings
+                                        },
+                                        contentDescription = null
+                                    )
+                                },
+                                trailingIcon = {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = actionExpanded)
+                                },
+                                colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor()
+                            )
+
+                            ExposedDropdownMenu(
+                                expanded = actionExpanded,
+                                onDismissRequest = { actionExpanded = false }
+                            ) {
+                                actionsList.forEach { action ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(when(action) {
+                                                "ON" -> "Turn On"
+                                                "OFF" -> "Turn Off"
+                                                "SET_COLOR" -> "Set Color"
+                                                "SET_BRIGHTNESS" -> "Set Brightness"
+                                                "CAPTURE" -> "Capture Image"
+                                                "ALERT_ON" -> "Enable Alerts"
+                                                "ALERT_OFF" -> "Disable Alerts"
+                                                "CHECK" -> "Check Status"
+                                                else -> action
+                                            })
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = when(action) {
+                                                    "ON" -> Icons.Default.PowerSettingsNew
+                                                    "OFF" -> Icons.Default.Power
+                                                    "SET_COLOR" -> Icons.Default.Palette
+                                                    "SET_BRIGHTNESS" -> Icons.Default.LightMode
+                                                    "CAPTURE" -> Icons.Default.Videocam
+                                                    "ALERT_ON", "ALERT_OFF", "CHECK" -> Icons.Default.Sensors
+                                                    else -> Icons.Default.Settings
+                                                },
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = {
+                                            selectedAction = action
+                                            actionExpanded = false
+                                            if (action == "SET_COLOR") {
+                                                showColorPicker = true
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Show color picker if SET_COLOR is selected
+                        if (selectedAction == "SET_COLOR" && selectedDeviceType == "Light") {
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = "Select Color",
+                                style = MaterialTheme.typography.titleSmall
+                            )
+
+                            // Color preview
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(40.dp)
+                                    .background(selectedColor)
+                                    .border(1.dp, Color.Gray)
+                                    .clickable { showColorPicker = true }
+                            )
+
+                            // Common colors
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                ColorButton(Color.Red, selectedColor, onColorSelected = {
+                                    selectedColor = it
+                                }) {}
+                                ColorButton(Color.Green, selectedColor, onColorSelected = {
+                                    selectedColor = it
+                                }) {}
+                                ColorButton(Color.Blue, selectedColor, onColorSelected = {
+                                    selectedColor = it
+                                }) {}
+                                ColorButton(Color.Yellow, selectedColor, onColorSelected = {
+                                    selectedColor = it
+                                }) {}
+                                ColorButton(Color.White, selectedColor, onColorSelected = {
+                                    selectedColor = it
+                                }) {}
+                            }
+                        }
+
+                        // Show brightness slider if SET_BRIGHTNESS is selected
+                        if (selectedAction == "SET_BRIGHTNESS" && selectedDeviceType == "Light") {
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Text(
+                                text = "Set Brightness: ${brightness.toInt()}%",
+                                style = MaterialTheme.typography.titleSmall
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LightMode,
+                                    contentDescription = "Low brightness",
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+
+                                Slider(
+                                    value = brightness,
+                                    onValueChange = { brightness = it },
+                                    valueRange = 0f..100f,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(horizontal = 8.dp)
+                                )
+
+                                Icon(
+                                    imageVector = Icons.Default.LightMode,
+                                    contentDescription = "High brightness",
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Error message (if any)
+                if (errorMessage != null) {
+                    Text(
+                        text = errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    // Validate inputs
+                    when {
+                        selectedDevice.isEmpty() && devicesList.isEmpty() -> {
+                            errorMessage = "Please add devices first"
+                            return@Button
+                        }
+                        selectedDevice.isEmpty() -> {
+                            errorMessage = "Please select a device"
+                            return@Button
+                        }
+                        selectedDays.isEmpty() -> {
+                            errorMessage = "Please select at least one day"
+                            return@Button
+                        }
+                        else -> {
+                            // Format days string
+                            val daysString = if (selectedDays.size == 7) {
+                                "Every day"
+                            } else {
+                                selectedDays.joinToString(", ")
+                            }
+
+                            // Format action string and value
+                            val (actionString, actionValue) = when (selectedAction) {
+                                "ON" -> Pair("turn ON", "")
+                                "OFF" -> Pair("turn OFF", "")
+                                "SET_COLOR" -> {
+                                    val hexColor = "#" + Integer.toHexString(selectedColor.toArgb()).substring(2)
+                                    Pair("set color to $hexColor", hexColor)
+                                }
+                                "SET_BRIGHTNESS" ->
+                                    Pair("set brightness to ${brightness.toInt()}%", brightness.toInt().toString())
+                                "CAPTURE" -> Pair("capture image", "")
+                                "ALERT_ON" -> Pair("enable alerts", "")
+                                "ALERT_OFF" -> Pair("disable alerts", "")
+                                "CHECK" -> Pair("check status", "")
+                                else -> Pair(selectedAction, "")
+                            }
+
+                            // Format time string
+                            val timeString = String.format("%d:%02d %s", selectedHour, selectedMinute, selectedAmPm)
+
+                            // Create schedule string
+                            val scheduleString = "$selectedDevice ($selectedDeviceType): $actionString at $timeString on $daysString"
+
+                            // Save and dismiss
+                            onSaveSchedule(scheduleString)
+                            onDismiss()
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Save,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Save Schedule")
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.outlinedButtonColors(),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                modifier = Modifier.padding(horizontal = 8.dp)
+            ) {
+                Text("Cancel")
+            }
+        }
+    )
+
+    // Full color picker dialog
+    if (showColorPicker) {
+        AlertDialog(
+            onDismissRequest = { showColorPicker = false },
+            title = { Text("Select Color") },
+            text = {
+                Column {
+                    // Color preview
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .background(Color(red, green, blue))
+                            .border(1.dp, Color.Gray)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // RGB sliders
+                    Text("Red")
+                    Slider(
+                        value = red,
+                        onValueChange = { red = it },
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.Red,
+                            activeTrackColor = Color.Red.copy(alpha = 0.5f)
+                        )
+                    )
+
+                    Text("Green")
+                    Slider(
+                        value = green,
+                        onValueChange = { green = it },
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.Green,
+                            activeTrackColor = Color.Green.copy(alpha = 0.5f)
+                        )
+                    )
+
+                    Text("Blue")
+                    Slider(
+                        value = blue,
+                        onValueChange = { blue = it },
+                        colors = SliderDefaults.colors(
+                            thumbColor = Color.Blue,
+                            activeTrackColor = Color.Blue.copy(alpha = 0.5f)
+                        )
+                    )
+
+                    // Hex color code
+                    val hexColor = "#" + Integer.toHexString(Color(red, green, blue).toArgb()).substring(2).uppercase()
+                    Text(
+                        text = "Hex: $hexColor",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+
+                    // Preset colors
+                    Text(
+                        text = "Presets",
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                    )
+
+                    // Simple grid of preset colors
+                    val presetColors = listOf(
+                        Color.Red, Color.Green, Color.Blue, Color.Yellow,
+                        Color.Cyan, Color.Magenta, Color.White, Color(0xFFFF8C00), // Orange
+                        Color(0xFF800080), Color(0xFF98FB98), Color(0xFF87CEEB), Color(0xFFFFB6C1) // Purple, Pale green, Sky blue, Pink
+                    )
+
+                    // Create a row-based grid
+                    Column {
+                        for (i in 0 until presetColors.size step 4) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                for (j in 0 until minOf(4, presetColors.size - i)) {
+                                    val color = presetColors[i + j]
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(4.dp)
+                                            .size(32.dp)
+                                            .background(color, CircleShape)
+                                            .border(
+                                                width = 2.dp,
+                                                color = if (Color(red, green, blue) == color)
+                                                    MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                shape = CircleShape
+                                            )
+                                            .clickable {
+                                                red = color.red
+                                                green = color.green
+                                                blue = color.blue
+                                            }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    selectedColor = Color(red, green, blue)
+                    showColorPicker = false
+                }) {
+                    Text("Select")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showColorPicker = false }) {
                     Text("Cancel")
                 }
             }
         )
     }
 }
+
+
 @Composable
 fun DeviceListItem(
     deviceName: String,
