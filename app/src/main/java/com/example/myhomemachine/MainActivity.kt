@@ -2,6 +2,11 @@ package com.example.myhomemachine
 
 import android.Manifest.permission
 import android.app.Application as AndroidApplication
+// for the Notification in the plug
+import com.example.myhomemachine.DeviceType
+import com.example.myhomemachine.EventType
+
+
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -284,6 +289,8 @@ class MainActivity : AppCompatActivity() {
     private var isLightOn = false
     private var lastColor: String = "hue:0 saturation:0 brightness:1" // Default color (White)
     private var currentBrightness: Float = 0.8f // Default brightness (80%)
+    private lateinit var deviceController: DeviceController
+
 
     private val channelId = "i.apps.notifications" // Unique channel ID for notifications
     private val description = "Test notification"  // Description for the notification channel
@@ -293,10 +300,13 @@ class MainActivity : AppCompatActivity() {
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        deviceController = DeviceController(this)
 
         checkAndRequestPermissions()
         createNotificationChannel()
-        sendNotification("Welcome to My Home", "Notification is working")
+
+        
+        //sendNotification("Welcome to My Home", "Notification is working")
 
         // Initialize SessionManager and PersistentDeviceManager
         val sessionManager = SessionManager(this)
@@ -352,20 +362,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendNotification(Title: String,Text: String) {
-        // Build the notification
+    private fun sendNotification(Title: String, Text: String) {
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(Title)
             .setContentText(Text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        // Show the notification
-        with(NotificationManagerCompat.from(this)) {
-            // Unique ID for the notification
-            notify(1, builder.build())
+        val notificationManager = NotificationManagerCompat.from(this)
+
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
+            notificationManager.notify(1, builder.build())
+        } else {
+            Log.w("Notification", "POST_NOTIFICATIONS permission not granted")
         }
     }
+
 
     private val scheduleReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -384,7 +397,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     "Plug" -> {
-                        val deviceController = DeviceController()
+                        val deviceController = DeviceController(context)
                         if (action == "ON") {
                             deviceController.turnOnPlug()
                             sendNotification("Schedule", "Plug turned ON")
@@ -433,7 +446,7 @@ class MainActivity : AppCompatActivity() {
                 sendNotification("Light Schedule", "Executed $action for $deviceName")
             }
             "Plug" -> {
-                val deviceController = DeviceController()
+                val deviceController = DeviceController(this)
                 when (action) {
                     "ON" -> deviceController.turnOnPlug()
                     "OFF" -> deviceController.turnOffPlug()
@@ -656,19 +669,36 @@ class MainActivity : AppCompatActivity() {
 }
 
 // DeviceController class to manage the Shelly Plug
-class DeviceController {
+class DeviceController (private val context: Context) {
+
     private val client = OkHttpClient()
+    private val deviceNotifier = DeviceNotificationManager(context)
+
     //private val shellyIpAddress = "http://10.5.2.30" // Shelly plug IP (this is specifically for b2 wifi network it will change later)
 
     // Function to turn on the Shelly Plug
     fun turnOnPlug() {
         toggleShellyRelay(true)
+        deviceNotifier.sendDeviceNotification(
+            deviceType = DeviceType.PLUG,
+            eventType = EventType.STATUS_CHANGE,
+            deviceName = "Shelly Plug",
+            additionalDetails = "Plug turned ON")
+
     }
+
 
     // Turn off the Shelly Plug
     fun turnOffPlug() {
         toggleShellyRelay(false)
+        deviceNotifier.sendDeviceNotification(
+            deviceType = DeviceType.PLUG,
+            eventType = EventType.STATUS_CHANGE,
+            deviceName = "Shelly Plug",
+            additionalDetails = "Plug turned OFF")
     }
+
+
 
 
     // Send the request and log the response
@@ -1138,6 +1168,7 @@ fun WifiMonitorScreen(navController: NavHostController) {
 
         notificationManager.notify(1, notificationBuilder.build())
     }
+
 
     // Periodically check the Wi‑Fi connection status.
     LaunchedEffect(Unit) {
@@ -2420,6 +2451,7 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                         showConfirmDialog = false
                         onDeviceAdded()
                         navController.navigateUp()
+
                     }
                 ) {
                     Text("Confirm")
@@ -2433,6 +2465,7 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
         )
     }
 }
+
 
 //working lightscreen 2.0
 /*
@@ -3484,6 +3517,12 @@ fun CamerasScreen(navController: NavHostController) {
                             onClick = {
                                 toggleMotionDetection("light") {
                                     motionDetectionLight = !motionDetectionLight
+                                    DeviceNotificationManager(context).sendDeviceNotification(
+                                        deviceType = DeviceType.CAMERA,
+                                        eventType = EventType.MOTION_DETECTED,
+                                        deviceName = selectedCamera ?: "Camera",
+                                        additionalDetails = if (motionDetectionLight) "Motion detection for Light enabled" else "Motion detection for Light disabled"
+                                    )
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -3498,6 +3537,12 @@ fun CamerasScreen(navController: NavHostController) {
                             onClick = {
                                 toggleMotionDetection("plug") {
                                     motionDetectionPlug = !motionDetectionPlug
+                                    DeviceNotificationManager(context).sendDeviceNotification(
+                                        deviceType = DeviceType.CAMERA,
+                                        eventType = EventType.MOTION_DETECTED,
+                                        deviceName = selectedCamera ?: "Camera",
+                                        additionalDetails = if (motionDetectionPlug) "Motion detection for Plug enabled" else "Motion detection for Plug disabled"
+                                    )
                                 }
                             },
                             modifier = Modifier.fillMaxWidth()
@@ -3602,7 +3647,15 @@ fun SensorsScreen(navController: NavHostController) {
                         knownSensors.forEach { sensor ->
                             DeviceListItem(
                                 deviceName = sensor,
-                                onSelect = { selectedSensor = sensor },
+                                onSelect = {
+                                    selectedSensor = sensor
+                                    DeviceNotificationManager(context).sendDeviceNotification(
+                                        deviceType = DeviceType.SENSOR,
+                                        eventType = EventType.STATUS_CHANGE,
+                                        deviceName = sensor,
+                                        additionalDetails = "Sensor selected"
+                                    )
+                                           },
                                 onDelete = { showDeleteConfirmation = sensor },
                                 isSelected = sensor == selectedSensor
                             )
@@ -3626,6 +3679,7 @@ fun SensorsScreen(navController: NavHostController) {
                             withContext(Dispatchers.Main) {
                                 currentMeterStatus = meterStatus
                                 isLoading = false
+
                             }
                         }
                     },
@@ -5436,7 +5490,8 @@ fun MyNavHost(
             )
         }
         composable("plugs") {
-            val deviceController = DeviceController()
+            val context = LocalContext.current
+            val deviceController = DeviceController(context)
             PlugsScreen(navController = navController, deviceController = deviceController)
         }
         composable("cameras") {
