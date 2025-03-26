@@ -23,7 +23,7 @@ interface LifxApiService {
     )
 }
 
-object RetrofitClient {
+object Retrofit_Client {
     private const val BASE_URL = "https://api.lifx.com/"
 
     val instance: LifxApiService by lazy {

@@ -9,6 +9,9 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 
+import com.example.myhomemachine.DeviceType
+import com.example.myhomemachine.EventType
+
 class DeviceNotificationManager(private val context: Context) {
     companion object {
         private const val CHANNEL_ID = "DeviceNotificationChannel"

@@ -251,25 +251,13 @@ private const val sbdeviceId = "F90D2BD4D12F" // Replace with your actual device
 private const val sbtoken = "68bc54e2a5495d4a8f560a38744a2a4178ff857528dd3a84f4eb51b6d75b516070f33a7b823e555f5fdb7d530df79997"
 private const val sbsecret = "28f1ee6611fbf2be9cfab357bc7a3480"
 
-data class SwitchBotResponse(
-    val statusCode: Int,
-    val body: DeviceStatus,
-    val message: String
-)
+
 fun String.capitalize(): String {
     return this.lowercase().replaceFirstChar {
         if (it.isLowerCase()) it.titlecase() else it.toString()
     }
 }
 
-data class DeviceStatus(
-    val deviceId: String,
-    val deviceType: String,
-    val hubDeviceId: String,
-    val humidity: Float,
-    val temperature: Float,
-    val battery: Float
-)
 
 class SharedViewModel(application: Application) : AndroidViewModel(application) {
     val logs = mutableStateListOf<String>()
@@ -290,6 +278,7 @@ class MainActivity : AppCompatActivity() {
     private var lastColor: String = "hue:0 saturation:0 brightness:1" // Default color (White)
     private var currentBrightness: Float = 0.8f // Default brightness (80%)
     private lateinit var deviceController: DeviceController
+    lateinit var retrofitClient: RetrofitClient
 
 
     private val channelId = "i.apps.notifications" // Unique channel ID for notifications
@@ -301,11 +290,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deviceController = DeviceController(this)
-
+        retrofitClient = RetrofitClient()
         checkAndRequestPermissions()
         createNotificationChannel()
 
-        
+
         //sendNotification("Welcome to My Home", "Notification is working")
 
         // Initialize SessionManager and PersistentDeviceManager
@@ -542,7 +531,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun turnLightOn() {
-        val apiService = RetrofitClient.instance
+        val apiService = retrofitClient.instance
         val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
 
         lifecycleScope.launch {
@@ -563,7 +552,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun turnLightOff() {
-        val apiService = RetrofitClient.instance
+        val apiService = retrofitClient.instance
         val body = LightState(power = "off", color = lastColor)
 
         lifecycleScope.launch {
@@ -586,7 +575,7 @@ class MainActivity : AppCompatActivity() {
     private fun setBrightness(brightness: Float) {
         currentBrightness = brightness // Store brightness
 
-        val apiService = RetrofitClient.instance
+        val apiService = retrofitClient.instance
         val body = LightState(
             power = "on", // Always keep the light on when changing brightness
             brightness = brightness,
@@ -623,7 +612,7 @@ class MainActivity : AppCompatActivity() {
         val hsb = convertColorToHSB(color) // Convert Color to HSB
         lastColor = "hue:${hsb[0]} saturation:${hsb[1]} brightness:$currentBrightness"
 
-        val apiService = RetrofitClient.instance
+        val apiService = retrofitClient.instance
         val body = LightState(color = lastColor, power = "on")
 
         lifecycleScope.launch {
@@ -834,20 +823,6 @@ suspend fun fetchTemperature(): Double? {
     }
 }
 */
-
-data class MeterStatus(
-    val temperature: Double,
-    val humidity: Double,
-    val battery: Int,
-    val dewPoint: Double,
-    val heatIndex: Double,
-    val absoluteHumidity: Double,
-    val vaporPressure: Double,
-    val saturationVaporPressure: Double,
-    val vaporPressureDeficit: Double,
-    val mixingRatio: Double,
-    val enthalpy: Double
-)
 
 
 suspend fun forceCloudSync() {
@@ -3655,7 +3630,7 @@ fun SensorsScreen(navController: NavHostController) {
                                         deviceName = sensor,
                                         additionalDetails = "Sensor selected"
                                     )
-                                           },
+                                },
                                 onDelete = { showDeleteConfirmation = sensor },
                                 isSelected = sensor == selectedSensor
                             )
