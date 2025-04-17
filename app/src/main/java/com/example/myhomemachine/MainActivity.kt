@@ -241,6 +241,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+
+
 // lifx stuff super unsecure
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
 private const val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
@@ -1984,6 +1991,9 @@ fun LoginScreen(navController: NavHostController) {
         }
     }
 }
+
+
+/* 04-17-2025 working homescreen, welcomesection, devicegrid, devicecatcard, bottombuttons, devicecat class
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -2185,6 +2195,329 @@ private data class DeviceCategory(
     val icon: ImageVector,
     val route: String
 )
+
+
+ */
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HomeScreen(
+    navController: NavHostController,
+    sessionManager: SessionManager
+) {
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = {
+                    Text(
+                        "My Home Machine",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                actions = {
+                    IconButton(onClick = { navController.navigate("settings") }) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            Color(0xFF2196F3),
+                            Color.White,
+                            Color.White,
+                            MaterialTheme.colorScheme.primary
+                        ),
+                        start = Offset(0f, Float.POSITIVE_INFINITY),
+                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                    )
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 100.dp) // so content doesn't hide behind the buttons
+            ) {
+                WelcomeSection()
+                DeviceGrid(navController)
+            }
+
+            BottomButtons(navController) // now absolutely positioned
+        }
+
+    }
+}
+
+@Composable
+private fun WelcomeSection() {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Welcome Home",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Icon(
+                    imageVector = Icons.Default.Home,
+                    contentDescription = "Welcome Icon",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Control your home environment with ease",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+
+
+@Composable
+private fun DeviceGrid(navController: NavHostController) {
+    val deviceCategories = listOf(
+        DeviceCategory("Lights", Icons.Default.Lightbulb, "lights"),
+        DeviceCategory("Plugs", Icons.Default.PowerSettingsNew, "plugs"),
+        DeviceCategory("Cameras", Icons.Default.Videocam, "cameras"),
+        DeviceCategory("Sensors", Icons.Default.SensorsOff, "sensors")
+    )
+
+    Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+        Text(
+            text = "Device Categories",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            modifier = Modifier.padding(bottom = 20.dp)
+        )
+
+        for (chunk in deviceCategories.chunked(2)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                chunk.forEach { category ->
+                    DeviceCategoryCard(
+                        category = category,
+                        modifier = Modifier.weight(1f),
+                        onClick = { navController.navigate(category.route) }
+                    )
+                }
+                if (chunk.size == 1) Spacer(modifier = Modifier.weight(1f))
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+
+@Composable
+private fun DeviceCategoryCard(
+    category: DeviceCategory,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val supportsToggle = category.name in listOf("Lights", "Plugs")
+
+    // Static mock device list with initial ON/OFF state
+    val mockDevices = mapOf(
+        "Lights" to listOf("LIFX A19 Bulb" to true),
+        "Plugs" to listOf("Shelly Plug" to false),
+        "Cameras" to listOf("Raspberry PI" to true),
+        "Sensors" to listOf("SWITCHBOT sensor" to true)
+    )
+
+    val devices = mockDevices[category.name] ?: emptyList()
+
+    // Remembered local state for toggles (only for interactive ones)
+    val deviceStates = remember {
+        devices.map { (name, isOn) -> name to mutableStateOf(isOn) }
+    }
+
+    ElevatedCard(
+        modifier = modifier
+            .heightIn(min = 180.dp)
+            .fillMaxWidth()
+            .shadow(4.dp),
+        shape = RoundedCornerShape(20.dp),
+        onClick = onClick,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = category.icon,
+                    contentDescription = category.name,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "${devices.size}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // List of devices with icons and (optional) toggle buttons
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                deviceStates.forEach { (deviceName, isOnState) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (isOnState.value) Icons.Default.Power else Icons.Default.PowerSettingsNew,
+                                contentDescription = if (isOnState.value) "On" else "Off",
+                                modifier = Modifier.size(16.dp),
+                                tint = if (isOnState.value) Color(0xFF4CAF50) else Color(0xFFB0BEC5)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = deviceName,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+
+                        if (supportsToggle) {
+                            IconButton(onClick = {
+                                isOnState.value = !isOnState.value
+                            }) {
+                                Icon(
+                                    imageVector = if (isOnState.value) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
+                                    contentDescription = "Toggle",
+                                    tint = if (isOnState.value) Color(0xFF4CAF50) else Color(0xFFB0BEC5),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+@Composable
+private fun BottomButtons(navController: NavHostController) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+    ) {
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 20.dp, start = 20.dp, end = 20.dp), // ← fixed position
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlinedButton(
+                onClick = { navController.navigate("schedule") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                //Text("Schedule", style = MaterialTheme.typography.labelLarge)
+            }
+
+            Button(
+                onClick = { navController.navigate("addDevice") },
+                modifier = Modifier.weight(3f),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Device", style = MaterialTheme.typography.labelLarge)
+            }
+
+            OutlinedButton(
+                onClick = { navController.navigate("profile") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                //Text("Profile", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
+
+
+
+
+
+private data class DeviceCategory(
+    val name: String,
+    val icon: ImageVector,
+    val route: String
+)
+
+
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -2425,7 +2758,7 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
 
                         showConfirmDialog = false
                         onDeviceAdded()
-                        navController.navigateUp()
+                        navController.navigate("home")
 
                     }
                 ) {
