@@ -2203,7 +2203,9 @@ private data class DeviceCategory(
 @Composable
 fun HomeScreen(
     navController: NavHostController,
-    sessionManager: SessionManager
+    sessionManager: SessionManager,
+    onTurnLightOn: () -> Unit,
+    onTurnLightOff: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -2254,7 +2256,19 @@ fun HomeScreen(
                     .padding(bottom = 100.dp) // so content doesn't hide behind the buttons
             ) {
                 WelcomeSection()
-                DeviceGrid(navController)
+                var isLightOn by remember { mutableStateOf(false) }
+                DeviceGrid(
+                    navController = navController,
+                    isLightOn = isLightOn,
+                    onTurnLightOn = {
+                        onTurnLightOn()
+                        isLightOn = true
+                    },
+                    onTurnLightOff = {
+                        onTurnLightOff()
+                        isLightOn = false
+                    }
+                )
             }
 
             BottomButtons(navController) // now absolutely positioned
@@ -2314,7 +2328,12 @@ private fun WelcomeSection() {
 
 
 @Composable
-private fun DeviceGrid(navController: NavHostController) {
+private fun DeviceGrid(
+    navController: NavHostController,
+    isLightOn: Boolean,
+    onTurnLightOn: () -> Unit,
+    onTurnLightOff: () -> Unit
+) {
     val deviceCategories = listOf(
         DeviceCategory("Lights", Icons.Default.Lightbulb, "lights"),
         DeviceCategory("Plugs", Icons.Default.PowerSettingsNew, "plugs"),
@@ -2338,7 +2357,13 @@ private fun DeviceGrid(navController: NavHostController) {
                     DeviceCategoryCard(
                         category = category,
                         modifier = Modifier.weight(1f),
-                        onClick = { navController.navigate(category.route) }
+                        onClick = { navController.navigate(category.route) },
+                        isLightOn = if (category.name == "Lights") isLightOn else false,
+                        onTogglePower = if (category.name == "Lights") {
+                            {
+                                if (isLightOn) onTurnLightOff() else onTurnLightOn()
+                            }
+                        } else null
                     )
                 }
                 if (chunk.size == 1) Spacer(modifier = Modifier.weight(1f))
@@ -2348,12 +2373,14 @@ private fun DeviceGrid(navController: NavHostController) {
     }
 }
 
-
+/* working toggle switch light
 @Composable
 private fun DeviceCategoryCard(
     category: DeviceCategory,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    isLightOn: Boolean = false, // 🔁 current light state
+    onTogglePower: (() -> Unit)? = null // 🔁 toggle logic
 ) {
     val supportsToggle = category.name in listOf("Lights", "Plugs")
 
@@ -2438,14 +2465,141 @@ private fun DeviceCategoryCard(
 
                         if (supportsToggle) {
                             IconButton(onClick = {
-                                isOnState.value = !isOnState.value
+                                if (category.name == "Lights") {
+                                    onTogglePower?.invoke()
+                                }
                             }) {
                                 Icon(
-                                    imageVector = if (isOnState.value) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
+                                    imageVector = if (isLightOn) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
                                     contentDescription = "Toggle",
-                                    tint = if (isOnState.value) Color(0xFF4CAF50) else Color(0xFFB0BEC5),
+                                    tint = if (isLightOn) Color(0xFF4CAF50) else Color(0xFFB0BEC5),
                                     modifier = Modifier.size(28.dp)
                                 )
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+    }
+}
+
+ */
+
+@Composable
+private fun DeviceCategoryCard(
+    category: DeviceCategory,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    isLightOn: Boolean = false,
+    onTogglePower: (() -> Unit)? = null
+) {
+    val supportsToggle = category.name in listOf("Lights", "Plugs")
+
+    // Get real devices for each category
+    val lights = DeviceManager.knownLights
+    val plugs = DeviceManager.knownPlugs
+    val cameras = DeviceManager.knownCameras
+    val sensors = DeviceManager.knownSensors
+
+    val realDevices = when (category.name) {
+        "Lights" -> lights
+        "Plugs" -> plugs
+        "Cameras" -> cameras
+        "Sensors" -> sensors
+        else -> emptyList()
+    }
+
+    // If no devices have been added, don't show the list
+    val showDeviceList = realDevices.isNotEmpty()
+
+    // Maintain UI toggle state per device name
+    val deviceStates = remember {
+        realDevices.associateWith { mutableStateOf(isLightOn) }
+    }
+
+    ElevatedCard(
+        modifier = modifier
+            .heightIn(min = if (showDeviceList) 180.dp else 140.dp)
+            .fillMaxWidth()
+            .shadow(4.dp),
+        shape = RoundedCornerShape(20.dp),
+        onClick = onClick,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth()
+        ) {
+            // Title
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = category.icon,
+                    contentDescription = category.name,
+                    modifier = Modifier.size(32.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = category.name,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                Text(
+                    text = "${realDevices.size}",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+
+            // Device list
+            if (showDeviceList) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    realDevices.forEach { deviceName ->
+                        val isOnState = deviceStates[deviceName] ?: remember { mutableStateOf(false) }
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = if (isOnState.value) Icons.Default.Power else Icons.Default.PowerSettingsNew,
+                                    contentDescription = if (isOnState.value) "On" else "Off",
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (isOnState.value) Color(0xFF4CAF50) else Color(0xFFB0BEC5)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = deviceName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                            }
+
+                            if (supportsToggle) {
+                                IconButton(onClick = {
+                                    isOnState.value = !isOnState.value
+                                    if (category.name == "Lights") {
+                                        onTogglePower?.invoke()
+                                    }
+                                }) {
+                                    Icon(
+                                        imageVector = if (isOnState.value) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
+                                        contentDescription = "Toggle",
+                                        tint = if (isOnState.value) Color(0xFF4CAF50) else Color(0xFFB0BEC5),
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -2454,7 +2608,6 @@ private fun DeviceCategoryCard(
         }
     }
 }
-
 
 
 
@@ -5779,7 +5932,9 @@ fun MyNavHost(
         composable("home") {
             HomeScreen(
                 navController = navController,
-                sessionManager = sessionManager // Pass SessionManager to HomeScreen
+                sessionManager = sessionManager,
+                onTurnLightOn = onTurnLightOn,
+                onTurnLightOff = onTurnLightOff
             )
         }
         composable("addDevice") {
@@ -5838,6 +5993,8 @@ fun PreviewHomeScreen() {
 
     HomeScreen(
         navController = navController,
-        sessionManager = mockSessionManager
+        sessionManager = mockSessionManager,
+        onTurnLightOn = {}, // 🔧 pass no-op lambda
+        onTurnLightOff = {} // 🔧 pass no-op lambda
     )
 }
