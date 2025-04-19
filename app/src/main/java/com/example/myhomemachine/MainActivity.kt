@@ -334,7 +334,8 @@ class MainActivity : AppCompatActivity() {
                         setBrightness = { brightness -> this.setBrightness(brightness) },
                         onSetColor = { color -> setColor(color) },
                         sessionManager = sessionManager,  // Pass SessionManager to NavHost
-                        deviceManager = deviceManager     // Pass DeviceManager to NavHost
+                        deviceManager = deviceManager,     // Pass DeviceManager to NavHost
+                        deviceController = deviceController
                     )
                 }
             }
@@ -2204,6 +2205,7 @@ private data class DeviceCategory(
 fun HomeScreen(
     navController: NavHostController,
     sessionManager: SessionManager,
+    deviceController: DeviceController,
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit
 ) {
@@ -2259,6 +2261,7 @@ fun HomeScreen(
                 var isLightOn by remember { mutableStateOf(false) }
                 DeviceGrid(
                     navController = navController,
+                    deviceController = deviceController,
                     isLightOn = isLightOn,
                     onTurnLightOn = {
                         onTurnLightOn()
@@ -2330,6 +2333,7 @@ private fun WelcomeSection() {
 @Composable
 private fun DeviceGrid(
     navController: NavHostController,
+    deviceController: DeviceController,
     isLightOn: Boolean,
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit
@@ -2358,6 +2362,8 @@ private fun DeviceGrid(
                         category = category,
                         modifier = Modifier.weight(1f),
                         onClick = { navController.navigate(category.route) },
+                        onTurnOnPlug = { deviceController.turnOnPlug() },
+                        onTurnOffPlug = { deviceController.turnOffPlug() },
                         isLightOn = if (category.name == "Lights") isLightOn else false,
                         onTogglePower = if (category.name == "Lights") {
                             {
@@ -2493,7 +2499,9 @@ private fun DeviceCategoryCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     isLightOn: Boolean = false,
-    onTogglePower: (() -> Unit)? = null
+    onTogglePower: (() -> Unit)? = null,
+    onTurnOnPlug: (() -> Unit)? = null,
+    onTurnOffPlug: (() -> Unit)? = null
 ) {
     val supportsToggle = category.name in listOf("Lights", "Plugs")
 
@@ -2589,8 +2597,15 @@ private fun DeviceCategoryCard(
                             if (supportsToggle) {
                                 IconButton(onClick = {
                                     isOnState.value = !isOnState.value
-                                    if (category.name == "Lights") {
-                                        onTogglePower?.invoke()
+                                    when (category.name) {
+                                        "Lights" -> onTogglePower?.invoke()
+                                        "Plugs" -> {
+                                            if (isOnState.value) {
+                                                onTurnOnPlug?.invoke()
+                                            } else {
+                                                onTurnOffPlug?.invoke()
+                                            }
+                                        }
                                     }
                                 }) {
                                     Icon(
@@ -5823,7 +5838,8 @@ fun MyNavHost(
     setBrightness: (Float) -> Unit,
     onSetColor: (Color) -> Unit,
     sessionManager: SessionManager,       // Add SessionManager parameter
-    deviceManager: PersistentDeviceManager // Add DeviceManager parameter
+    deviceManager: PersistentDeviceManager, // Add DeviceManager parameter
+    deviceController: DeviceController
 ) {
     NavHost(
         navController = navController,
@@ -5933,6 +5949,7 @@ fun MyNavHost(
             HomeScreen(
                 navController = navController,
                 sessionManager = sessionManager,
+                deviceController = deviceController,
                 onTurnLightOn = onTurnLightOn,
                 onTurnLightOff = onTurnLightOff
             )
@@ -5990,10 +6007,12 @@ fun PreviewHomeScreen() {
     val navController = rememberNavController() // Mock NavController for preview
     val context = LocalContext.current
     val mockSessionManager = remember { SessionManager(context) } // Create mock SessionManager for preview
+    val mockDeviceController = remember { DeviceController(context) }
 
     HomeScreen(
         navController = navController,
         sessionManager = mockSessionManager,
+        deviceController = mockDeviceController,
         onTurnLightOn = {}, // 🔧 pass no-op lambda
         onTurnLightOff = {} // 🔧 pass no-op lambda
     )
