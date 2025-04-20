@@ -58,7 +58,7 @@ fun SettingsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
+                    containerColor = Color(0xFF0069FF),
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                     navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
@@ -98,7 +98,7 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.Email,
                             contentDescription = "Email",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = Color(0xFF0069FF)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
@@ -126,7 +126,8 @@ fun SettingsScreen(
                             val userId = userDetails[SessionManager.KEY_USER_ID] ?: "user_id"
                             sessionManager.createLoginSession(userId, userEmail, newValue)
                             isRememberMeEnabled = newValue
-                        }
+                        }//,
+                        //        iconTint = Color(0xFF0069FF)
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -257,7 +258,7 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = "Version",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = Color(0xFF0069FF)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
@@ -473,7 +474,7 @@ fun SettingsButton(
     subText: String? = null,
     onClick: () -> Unit,
     textColor: Color = Color.Unspecified,
-    iconTint: Color = MaterialTheme.colorScheme.primary
+    iconTint: Color = Color(0xFF0069FF)
 ) {
     Row(
         modifier = Modifier
@@ -506,7 +507,7 @@ fun SettingsButton(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = "Navigate",
             modifier = Modifier.alpha(0.6f),
-            tint = MaterialTheme.colorScheme.onSurface
+            tint = Color(0xFF0069FF)
         )
     }
 }
@@ -516,7 +517,8 @@ fun SettingsToggle(
     icon: ImageVector,
     text: String,
     initialState: Boolean,
-    onToggle: (Boolean) -> Unit
+    onToggle: (Boolean) -> Unit,
+    iconTint: Color = MaterialTheme.colorScheme.primary
 ) {
     var isChecked by remember { mutableStateOf(initialState) }
 
@@ -529,7 +531,7 @@ fun SettingsToggle(
         Icon(
             imageVector = icon,
             contentDescription = text,
-            tint = MaterialTheme.colorScheme.primary
+            tint = Color(0xFF0069FF)
         )
         Spacer(modifier = Modifier.width(16.dp))
         Text(
@@ -542,7 +544,13 @@ fun SettingsToggle(
             onCheckedChange = {
                 isChecked = it
                 onToggle(it)
-            }
+            },
+            colors = SwitchDefaults.colors(
+                //checkedThumbColor = Color(0xFF0069FF),
+                checkedTrackColor = Color(0xFF0069FF),
+                uncheckedThumbColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                uncheckedTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+            )
         )
     }
 }

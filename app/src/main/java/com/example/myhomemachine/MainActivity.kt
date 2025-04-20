@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -240,12 +241,14 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
-
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.OutlinedTextFieldDefaults
 
 
 // lifx stuff super unsecure
@@ -1292,7 +1295,7 @@ fun WifiMonitorScreen(navController: NavHostController) {
 
  */
 
-
+@OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.M)
 @Composable
 fun ShellyScreen(
@@ -1300,9 +1303,22 @@ fun ShellyScreen(
     wifiScanner: WifiScanner,
     logs: MutableList<String>
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary,
+                        //Color(0xFF2196F3),
+                        Color.White,
+                        Color.White,
+                        MaterialTheme.colorScheme.primary
+                        ),
+                    start = Offset(0f, Float.POSITIVE_INFINITY),
+                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -1311,12 +1327,18 @@ fun ShellyScreen(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top Section (Placeholder for Logo or Title)
-            Text(
-                text = "Shelly Plug Setup",
-                style = MaterialTheme.typography.headlineLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 16.dp)
+            TopAppBar(
+                title = { Text("Shelly Plug Setup") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
             )
 
             // Logs Display Section
@@ -1341,7 +1363,7 @@ fun ShellyScreen(
                             shape = MaterialTheme.shapes.medium
                         )
                         .padding(8.dp)
-                        .verticalScroll(rememberScrollState()) // Make logs scrollable
+                        .verticalScroll(rememberScrollState())
                 ) {
                     logs.forEach { log ->
                         Text(
@@ -1358,7 +1380,7 @@ fun ShellyScreen(
                     onClick = { logs.clear() },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text(text = "Clear Logs")
@@ -1372,7 +1394,7 @@ fun ShellyScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.secondary
+                    containerColor = MaterialTheme.colorScheme.primary
                 )
             ) {
                 Text(text = "Scan for Shelly Plug and Connect")
@@ -1394,6 +1416,7 @@ fun ShellyScreen(
         }
     }
 }
+
 
 @Composable
 fun SignupScreen(navController: NavHostController) {
@@ -2241,7 +2264,8 @@ fun HomeScreen(
                 .background(
                     brush = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFF2196F3),
+                            MaterialTheme.colorScheme.secondary,
+                            //Color(0xFF2196F3),
                             Color.White,
                             Color.White,
                             MaterialTheme.colorScheme.primary
@@ -2660,12 +2684,13 @@ private fun BottomButtons(navController: NavHostController) {
                 Text("Add Device", style = MaterialTheme.typography.labelLarge)
             }
 
-            OutlinedButton(
-                onClick = { navController.navigate("profile") },
+            OutlinedButton( // AI BUTTON
+                onClick = { navController.navigate("settings") },
+                //onClick = { navController.navigate("aiscreen") },
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.CoPresent, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 //Text("Profile", style = MaterialTheme.typography.labelLarge)
             }
@@ -2690,66 +2715,62 @@ private data class DeviceCategory(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController) {
-    // State variables
     var selectedDeviceType by remember { mutableStateOf("") }
     var selectedDeviceName by remember { mutableStateOf<String?>(null) }
     var customDeviceName by remember { mutableStateOf("") }
     var typeExpanded by remember { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
 
-    // Get context and create PersistentDeviceManager
     val context = LocalContext.current
     val deviceManager = remember { PersistentDeviceManager(context) }
 
-    // Define device types and associated device names
     val deviceTypes = listOf("Camera", "Light", "Plug", "Sensor")
     val devicesByType = mapOf(
         "Camera" to listOf("RaspberryPiCamera"),
-        "Light" to listOf("LIFX Smart Light"),  // Only one smart light option now
-        "Plug" to listOf("Shelly Smart Plug"),  // Only one plug option now
+        "Light" to listOf("LIFX Smart Light"),
+        "Plug" to listOf("Shelly Smart Plug"),
         "Sensor" to listOf("SwitchBot Meter")
     )
 
-
-    Scaffold(
-        topBar = {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF1B5E20), // Top green
+                        Color.White,
+                        Color.White,
+                        MaterialTheme.colorScheme.secondary  // Bottom blue
+                    ),
+                    start = Offset(0f, Float.POSITIVE_INFINITY),
+                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                )
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             TopAppBar(
                 title = { Text("Add New Device") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
+                    containerColor = MaterialTheme.colorScheme.secondary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                     navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
             )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Device Type Selection Card
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Text(
-                        text = "1. Select Device Type",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("1. Select Device Type", style = MaterialTheme.typography.titleMedium)
 
                     ExposedDropdownMenuBox(
                         expanded = typeExpanded,
@@ -2761,8 +2782,14 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                             readOnly = true,
                             label = { Text("Device Type") },
                             trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = typeExpanded)
+                                ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded)
                             },
+                            colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(
+                                focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.secondary,
+                                focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                                cursorColor = MaterialTheme.colorScheme.secondary
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .menuAnchor()
@@ -2798,19 +2825,10 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                 }
             }
 
-            // Device Selection Card
             if (selectedDeviceType.isNotEmpty()) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "2. Select Available Device",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("2. Select Available Device", style = MaterialTheme.typography.titleMedium)
 
                         devicesByType[selectedDeviceType]?.forEach { device ->
                             Row(
@@ -2823,7 +2841,10 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                             ) {
                                 RadioButton(
                                     selected = selectedDeviceName == device,
-                                    onClick = { selectedDeviceName = device }
+                                    onClick = { selectedDeviceName = device },
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = MaterialTheme.colorScheme.secondary
+                                    )
                                 )
                                 Text(device)
                             }
@@ -2832,33 +2853,29 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                 }
             }
 
-            // Custom Name Card
             if (selectedDeviceName != null) {
-                Card(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Text(
-                            text = "3. Set Custom Name (Optional)",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("3. Set Custom Name (Optional)", style = MaterialTheme.typography.titleMedium)
 
                         OutlinedTextField(
                             value = customDeviceName,
                             onValueChange = { customDeviceName = it },
                             label = { Text("Custom Name") },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.secondary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.secondary,
+                                focusedLabelColor = MaterialTheme.colorScheme.secondary,
+                                cursorColor = MaterialTheme.colorScheme.secondary
+                            ),
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text(selectedDeviceName ?: "") }
                         )
+
                     }
                 }
             }
 
-
-            // shelly device add screen button
             Column(
                 modifier = Modifier
                     .padding(bottom = 32.dp)
@@ -2867,45 +2884,43 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Button(
-                    onClick = { navController.navigate("shelly") }, // Replace "shelly" with "main_screen"
+                    onClick = { navController.navigate("shelly") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                         .animateContentSize(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
+                        containerColor = MaterialTheme.colorScheme.secondary
                     ),
                     elevation = ButtonDefaults.buttonElevation(
                         defaultElevation = 4.dp,
                         pressedElevation = 8.dp
                     ),
-                    enabled = selectedDeviceType == "Plug" && selectedDeviceName == "Shelly Smart Plug" // Only enable when Shelly Smart Plug is selected
+                    enabled = selectedDeviceType == "Plug" && selectedDeviceName == "Shelly Smart Plug"
                 ) {
                     Text("Navigate to add Shelly Smart Plug")
                 }
             }
 
-            // Add Device Button
             if (selectedDeviceName != null) {
                 Button(
                     onClick = { showConfirmDialog = true },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        .padding(vertical = 8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
                     )
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Add Device")
                 }
+
             }
         }
     }
 
-    // Confirmation Dialog
     if (showConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showConfirmDialog = false },
@@ -2920,27 +2935,34 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                 Button(
                     onClick = {
                         val deviceName = customDeviceName.ifEmpty { selectedDeviceName ?: "" }
-
-                        // Use PersistentDeviceManager instead of DeviceManager
                         deviceManager.addDevice(deviceName, selectedDeviceType)
-
                         showConfirmDialog = false
                         onDeviceAdded()
                         navController.navigate("home")
-
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondary
+                    )
                 ) {
                     Text("Confirm")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) {
+                TextButton(
+                    onClick = { showConfirmDialog = false },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = Color.Black
+                    )
+                ) {
                     Text("Cancel")
                 }
             }
+
         )
     }
 }
+
+
 
 
 //working lightscreen 2.0
@@ -3168,6 +3190,9 @@ fun LightsScreen(
 
  */
 
+
+
+/* 2.43 working lightscreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LightsScreen(
@@ -3355,6 +3380,211 @@ fun LightsScreen(
         )
     }
 }
+ */
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LightsScreen(
+    navController: NavHostController,
+    onTurnLightOn: () -> Unit,
+    onTurnLightOff: () -> Unit,
+    onBrightnessChange: (Float) -> Unit,
+    onSetColor: (Color) -> Unit
+) {
+    val knownLights = DeviceManager.knownLights
+    var selectedLight by remember { mutableStateOf<String?>(null) }
+    var isLightOn by remember { mutableStateOf(false) }
+    var selectedColor by remember { mutableStateOf(Color.White) }
+    var brightness by remember { androidx.compose.runtime.mutableFloatStateOf(0.8f) }
+    var showScheduleDialog by remember { mutableStateOf(false) }
+    var showConfirmation by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+    val deviceManager = remember { PersistentDeviceManager(context) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Lights Control") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.navigateUp() }) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                )
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.secondary,
+                                    //Color(0xFF2196F3),
+                            Color.White,
+                            Color.White,
+                            MaterialTheme.colorScheme.primary
+                        ),
+                        start = Offset(0f, Float.POSITIVE_INFINITY),
+                        end = Offset(Float.POSITIVE_INFINITY, 0f)
+                    )
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Select Light",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        if (knownLights.isEmpty()) {
+                            Text(
+                                text = "No lights added yet. Add a light from the home screen.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        } else {
+                            knownLights.forEach { light ->
+                                DeviceListItem(
+                                    deviceName = light,
+                                    onSelect = { selectedLight = light },
+                                    onDelete = { showDeleteConfirmation = light },
+                                    isSelected = light == selectedLight
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (selectedLight != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    LightControlsCard(
+                        isLightOn = isLightOn,
+                        onPowerChange = {
+                            if (isLightOn) {
+                                onTurnLightOff()
+                                isLightOn = false
+                            } else {
+                                onTurnLightOn()
+                                isLightOn = true
+                            }
+                        },
+                        brightness = brightness,
+                        onBrightnessChange = {
+                            brightness = it
+                            onBrightnessChange(it)
+                        },
+                        selectedColor = selectedColor
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    ColorSelectionCard(
+                        selectedColor = selectedColor,
+                        onColorSelected = { color ->
+                            selectedColor = color
+                            onSetColor(color)
+                        },
+                        setColor = onSetColor
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    ActionButtons(
+                        onScheduleClick = { showScheduleDialog = true },
+                        onSaveClick = { showConfirmation = true }
+                    )
+                }
+            }
+        }
+    }
+
+    showDeleteConfirmation?.let { deviceName ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("Delete Device") },
+            text = { Text("Are you sure you want to remove $deviceName?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deviceManager.removeDevice(deviceName, "Light")
+                        if (selectedLight == deviceName) {
+                            selectedLight = null
+                        }
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmation = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showScheduleDialog && selectedLight != null) {
+        EnhancedScheduleDialog(
+            onDismiss = { showScheduleDialog = false },
+            deviceName = selectedLight!!,
+            deviceType = "Light",
+            onSaveSchedule = { scheduleString ->
+                try {
+                    deviceManager.saveSchedule(scheduleString)
+                    Toast.makeText(context, "Schedule saved", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Log.e("LightsScreen", "Error saving schedule: ${e.message}", e)
+                    Toast.makeText(context, "Failed to save schedule", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+    }
+
+    if (showConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showConfirmation = false },
+            title = { Text("Success") },
+            text = { Text("Light settings have been saved successfully.") },
+            confirmButton = {
+                Button(onClick = {
+                    showConfirmation = false
+                    navController.navigateUp()
+                }) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+}
+
+
+
 
 // USED FOR SELECTING WHICH LIGHT YOU WANT TO USE
 @OptIn(ExperimentalMaterial3Api::class)
@@ -3757,7 +3987,6 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
     var isPlugOn by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
 
-    // Get context and PersistentDeviceManager
     val context = LocalContext.current
     val deviceManager = remember { PersistentDeviceManager(context) }
 
@@ -3778,85 +4007,103 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
-        ) {
-            // Plug Selection Card
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Select Smart Plug",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.secondary,
+                            //Color(0xFF2196F3),
+                            Color.White,
+                            Color.White,
+                            MaterialTheme.colorScheme.primary
+                        ),
+                        start = Offset(0f, Float.POSITIVE_INFINITY),
+                        end = Offset(Float.POSITIVE_INFINITY, 0f)
                     )
-
-                    if (knownPlugs.isEmpty()) {
-                        Text(
-                            text = "No plugs added yet. Add a plug from the home screen.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    } else {
-                        knownPlugs.forEach { plug ->
-                            DeviceListItem(
-                                deviceName = plug,
-                                onSelect = { selectedPlug = plug },
-                                onDelete = { showDeleteConfirmation = plug },
-                                isSelected = plug == selectedPlug
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Power Control Card
-            if (selectedPlug != null) {
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Plug Selection Card
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        IconButton(
-                            onClick = {
-                                if (isPlugOn) {
-                                    deviceController.turnOffPlug()  // Turn off the plug
-                                } else {
-                                    deviceController.turnOnPlug()  // Turn on the plug
-                                }
-                                isPlugOn = !isPlugOn  // Update the state
-                            },
-                            modifier = Modifier
-                                .size(64.dp)
-                                .background(
-                                    if (isPlugOn) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant,
-                                    CircleShape
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Select Smart Plug",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        if (knownPlugs.isEmpty()) {
+                            Text(
+                                text = "No plugs added yet. Add a plug from the home screen.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        } else {
+                            knownPlugs.forEach { plug ->
+                                DeviceListItem(
+                                    deviceName = plug,
+                                    onSelect = { selectedPlug = plug },
+                                    onDelete = { showDeleteConfirmation = plug },
+                                    isSelected = plug == selectedPlug
                                 )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Power Control Card
+                if (selectedPlug != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                Icons.Default.Power,
-                                contentDescription = if (isPlugOn) "Turn Off" else "Turn On",
-                                tint = if (isPlugOn) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(32.dp)
+                            IconButton(
+                                onClick = {
+                                    if (isPlugOn) {
+                                        deviceController.turnOffPlug()
+                                    } else {
+                                        deviceController.turnOnPlug()
+                                    }
+                                    isPlugOn = !isPlugOn
+                                },
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .background(
+                                        if (isPlugOn) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant,
+                                        CircleShape
+                                    )
+                            ) {
+                                Icon(
+                                    Icons.Default.Power,
+                                    contentDescription = if (isPlugOn) "Turn Off" else "Turn On",
+                                    tint = if (isPlugOn) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+
+                            Text(
+                                text = if (isPlugOn) "ON" else "OFF",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(top = 8.dp)
                             )
                         }
-
-                        Text(
-                            text = if (isPlugOn) "ON" else "OFF",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
                     }
                 }
             }
@@ -3894,6 +4141,7 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CamerasScreen(navController: NavHostController) {
@@ -3903,7 +4151,6 @@ fun CamerasScreen(navController: NavHostController) {
     var motionDetectionLight by remember { mutableStateOf(true) }
     var motionDetectionPlug by remember { mutableStateOf(true) }
 
-    // Get context and PersistentDeviceManager
     val context = LocalContext.current
     val deviceManager = remember { PersistentDeviceManager(context) }
 
@@ -3924,106 +4171,133 @@ fun CamerasScreen(navController: NavHostController) {
             )
         }
     ) { paddingValues ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
-        ) {
-            // Camera Selection Card
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Select Camera",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.secondary,
+                            //Color(0xFF2196F3),
+                            Color.White,
+                            Color.White,
+                            MaterialTheme.colorScheme.primary
+                        ),
+                        start = Offset(0f, Float.POSITIVE_INFINITY),
+                        end = Offset(Float.POSITIVE_INFINITY, 0f)
                     )
-
-                    if (knownCameras.isEmpty()) {
-                        Text(
-                            text = "No cameras added yet. Add a camera from the home screen.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    } else {
-                        knownCameras.forEach { camera ->
-                            DeviceListItem(
-                                deviceName = camera,
-                                onSelect = { selectedCamera = camera },
-                                onDelete = { showDeleteConfirmation = camera },
-                                isSelected = camera == selectedCamera
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Camera Preview Card
-            if (selectedCamera != null) {
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Camera Selection Card
                 Card(
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // WebView for camera stream
-                        AndroidView(
-                            factory = { context ->
-                                WebView(context).apply {
-                                    settings.javaScriptEnabled = true
-                                    webViewClient = WebViewClient()
-                                    loadUrl("http://10.5.2.37:5000/stream")  // Replace with Raspberry Pi IP
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Select Camera",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Toggle Motion Detection for Lights
-                        Button(
-                            onClick = {
-                                toggleMotionDetection("light") {
-                                    motionDetectionLight = !motionDetectionLight
-                                    DeviceNotificationManager(context).sendDeviceNotification(
-                                        deviceType = DeviceType.CAMERA,
-                                        eventType = EventType.MOTION_DETECTED,
-                                        deviceName = selectedCamera ?: "Camera",
-                                        additionalDetails = if (motionDetectionLight) "Motion detection for Light enabled" else "Motion detection for Light disabled"
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(if (motionDetectionLight) "Disable Light Motion Detection" else "Enable Light Motion Detection")
+                        if (knownCameras.isEmpty()) {
+                            Text(
+                                text = "No cameras added yet. Add a camera from the home screen.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        } else {
+                            knownCameras.forEach { camera ->
+                                DeviceListItem(
+                                    deviceName = camera,
+                                    onSelect = { selectedCamera = camera },
+                                    onDelete = { showDeleteConfirmation = camera },
+                                    isSelected = camera == selectedCamera
+                                )
+                            }
                         }
+                    }
+                }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                        // Toggle Motion Detection for Plug
-                        Button(
-                            onClick = {
-                                toggleMotionDetection("plug") {
-                                    motionDetectionPlug = !motionDetectionPlug
-                                    DeviceNotificationManager(context).sendDeviceNotification(
-                                        deviceType = DeviceType.CAMERA,
-                                        eventType = EventType.MOTION_DETECTED,
-                                        deviceName = selectedCamera ?: "Camera",
-                                        additionalDetails = if (motionDetectionPlug) "Motion detection for Plug enabled" else "Motion detection for Plug disabled"
-                                    )
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
+                // Camera Preview Card
+                if (selectedCamera != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(if (motionDetectionPlug) "Disable Plug Motion Detection" else "Enable Plug Motion Detection")
+                            AndroidView(
+                                factory = { context ->
+                                    WebView(context).apply {
+                                        settings.javaScriptEnabled = true
+                                        webViewClient = WebViewClient()
+                                        loadUrl("http://10.5.2.37:5000/stream")
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(300.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Button(
+                                onClick = {
+                                    toggleMotionDetection("light") {
+                                        motionDetectionLight = !motionDetectionLight
+                                        DeviceNotificationManager(context).sendDeviceNotification(
+                                            deviceType = DeviceType.CAMERA,
+                                            eventType = EventType.MOTION_DETECTED,
+                                            deviceName = selectedCamera ?: "Camera",
+                                            additionalDetails = if (motionDetectionLight)
+                                                "Motion detection for Light enabled"
+                                            else
+                                                "Motion detection for Light disabled"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (motionDetectionLight)
+                                    "Disable Light Motion Detection"
+                                else
+                                    "Enable Light Motion Detection")
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Button(
+                                onClick = {
+                                    toggleMotionDetection("plug") {
+                                        motionDetectionPlug = !motionDetectionPlug
+                                        DeviceNotificationManager(context).sendDeviceNotification(
+                                            deviceType = DeviceType.CAMERA,
+                                            eventType = EventType.MOTION_DETECTED,
+                                            deviceName = selectedCamera ?: "Camera",
+                                            additionalDetails = if (motionDetectionPlug)
+                                                "Motion detection for Plug enabled"
+                                            else
+                                                "Motion detection for Plug disabled"
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(if (motionDetectionPlug)
+                                    "Disable Plug Motion Detection"
+                                else
+                                    "Enable Plug Motion Detection")
+                            }
                         }
                     }
                 }
@@ -4062,6 +4336,7 @@ fun CamerasScreen(navController: NavHostController) {
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SensorsScreen(navController: NavHostController) {
@@ -4072,7 +4347,6 @@ fun SensorsScreen(navController: NavHostController) {
     var isLoading by remember { mutableStateOf(false) }
     var showCelsius by remember { mutableStateOf(true) }
 
-    // Get context and PersistentDeviceManager
     val context = LocalContext.current
     val deviceManager = remember { PersistentDeviceManager(context) }
 
@@ -4093,98 +4367,112 @@ fun SensorsScreen(navController: NavHostController) {
             )
         }
     ) { paddingValues ->
-        // Make the entire screen scrollable by wrapping everything in a Column with verticalScroll
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Sensor Selection Card
-            Card(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Select Sensor",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.secondary,
+                            //Color(0xFF2196F3),
+                            Color.White,
+                            Color.White,
+                            MaterialTheme.colorScheme.primary
+                        ),
+                        start = Offset(0f, Float.POSITIVE_INFINITY),
+                        end = Offset(Float.POSITIVE_INFINITY, 0f)
                     )
-
-                    if (knownSensors.isEmpty()) {
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Sensor Selection Card
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "No sensors added yet. Add a sensor from the home screen.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            text = "Select Sensor",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
-                    } else {
-                        knownSensors.forEach { sensor ->
-                            DeviceListItem(
-                                deviceName = sensor,
-                                onSelect = {
-                                    selectedSensor = sensor
-                                    DeviceNotificationManager(context).sendDeviceNotification(
-                                        deviceType = DeviceType.SENSOR,
-                                        eventType = EventType.STATUS_CHANGE,
-                                        deviceName = sensor,
-                                        additionalDetails = "Sensor selected"
-                                    )
-                                },
-                                onDelete = { showDeleteConfirmation = sensor },
-                                isSelected = sensor == selectedSensor
+
+                        if (knownSensors.isEmpty()) {
+                            Text(
+                                text = "No sensors added yet. Add a sensor from the home screen.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.padding(vertical = 8.dp)
                             )
+                        } else {
+                            knownSensors.forEach { sensor ->
+                                DeviceListItem(
+                                    deviceName = sensor,
+                                    onSelect = {
+                                        selectedSensor = sensor
+                                        DeviceNotificationManager(context).sendDeviceNotification(
+                                            deviceType = DeviceType.SENSOR,
+                                            eventType = EventType.STATUS_CHANGE,
+                                            deviceName = sensor,
+                                            additionalDetails = "Sensor selected"
+                                        )
+                                    },
+                                    onDelete = { showDeleteConfirmation = sensor },
+                                    isSelected = sensor == selectedSensor
+                                )
+                            }
                         }
                     }
                 }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Show button only if SwitchBot Meter is selected
-            if (selectedSensor == "SwitchBot Meter") {
-                Button(
-                    onClick = {
-                        isLoading = true
-                        CoroutineScope(Dispatchers.IO).launch {
-                            forceCloudSync() // Force cloud sync first
-                            delay(1000) // Adjust delay as needed
-
-                            val meterStatus = fetchMeterStatus()
-                            withContext(Dispatchers.Main) {
-                                currentMeterStatus = meterStatus
-                                isLoading = false
-
-                            }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Get Meter Status")
-                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Button(
-                    onClick = {
-                        showCelsius = !showCelsius
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (showCelsius) "Switch to Fahrenheit" else "Switch to Celsius"
+                if (selectedSensor == "SwitchBot Meter") {
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            CoroutineScope(Dispatchers.IO).launch {
+                                forceCloudSync()
+                                delay(1000)
+
+                                val meterStatus = fetchMeterStatus()
+                                withContext(Dispatchers.Main) {
+                                    currentMeterStatus = meterStatus
+                                    isLoading = false
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Get Meter Status")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            showCelsius = !showCelsius
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (showCelsius) "Switch to Fahrenheit" else "Switch to Celsius"
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    MeterStatusDisplay(
+                        currentMeterStatus = currentMeterStatus,
+                        isLoading = isLoading,
+                        showCelsius = showCelsius
                     )
                 }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Sensor Data Display
-                MeterStatusDisplay(
-                    currentMeterStatus = currentMeterStatus,
-                    isLoading = isLoading,
-                    showCelsius = showCelsius
-                )
             }
         }
     }
@@ -4219,6 +4507,7 @@ fun SensorsScreen(navController: NavHostController) {
         )
     }
 }
+
 
 /*
 // WORKING
@@ -4319,7 +4608,7 @@ fun TemperatureGauge(
             startAngle = 135f,
             sweepAngle = 270f,
             useCenter = false,
-            style = Stroke(width = 20f)
+            style = Stroke(width = 50f)
         )
         // Foreground arc showing current temperature
         drawArc(
@@ -4327,7 +4616,7 @@ fun TemperatureGauge(
             startAngle = 135f,
             sweepAngle = sweepAngle,
             useCenter = false,
-            style = Stroke(width = 26f)
+            style = Stroke(width = 50f)
         )
         // Draw the temperature value in the center
         drawContext.canvas.nativeCanvas.apply {
@@ -4358,14 +4647,14 @@ fun HumidityGauge(
             startAngle = 135f,
             sweepAngle = 270f,
             useCenter = false,
-            style = Stroke(width = 16f)
+            style = Stroke(width = 50f)
         )
         drawArc(
             color = Color.Blue,
             startAngle = 135f,
             sweepAngle = sweepAngle.toFloat(),
             useCenter = false,
-            style = Stroke(width = 30f)
+            style = Stroke(width = 50f)
         )
         drawContext.canvas.nativeCanvas.apply {
             drawText(
@@ -4395,7 +4684,7 @@ fun BatteryGauge(
             startAngle = 135f,
             sweepAngle = 270f,
             useCenter = false,
-            style = Stroke(width = 36f)
+            style = Stroke(width = 50f)
         )
         drawArc(
             color = Color.Green,
@@ -4641,6 +4930,8 @@ fun AirQualityDisplay(airQualityHistory: List<Int>) {
         }
     }
 }
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulePage(navController: NavHostController) {
@@ -4649,10 +4940,8 @@ fun SchedulePage(navController: NavHostController) {
     var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
     var showScheduleDialog by remember { mutableStateOf(false) }
 
-    // State for loading indicator
     var isLoading by remember { mutableStateOf(true) }
 
-    // Load schedules when the screen is displayed
     LaunchedEffect(Unit) {
         try {
             deviceManager.loadSchedules()
@@ -4663,9 +4952,21 @@ fun SchedulePage(navController: NavHostController) {
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        Color(0xFF1B5E20), // Green top
+                        Color.White,
+                        Color.White, // Middle
+                        MaterialTheme.colorScheme.secondary  // Blue bottom
+                    ),
+                    start = Offset(0f, Float.POSITIVE_INFINITY),
+                    end = Offset(Float.POSITIVE_INFINITY, 0f)
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -4674,7 +4975,6 @@ fun SchedulePage(navController: NavHostController) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top bar with back button and title
             TopAppBar(
                 title = { Text("Device Schedules") },
                 navigationIcon = {
@@ -4685,14 +4985,19 @@ fun SchedulePage(navController: NavHostController) {
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
+                colors = TopAppBarDefaults.topAppBarColors(  // Blue bottom
+                    containerColor = MaterialTheme.colorScheme.secondary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary,
                     navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
                 )
+
+                //colors = TopAppBarDefaults.topAppBarColors(
+                //    containerColor = MaterialTheme.colorScheme.primary,
+                //    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                //    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
+                //)
             )
 
-            // Loading indicator
             if (isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -4701,7 +5006,6 @@ fun SchedulePage(navController: NavHostController) {
                     CircularProgressIndicator()
                 }
             } else {
-                // Schedule list
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -4736,7 +5040,7 @@ fun SchedulePage(navController: NavHostController) {
                                         imageVector = Icons.Default.Schedule,
                                         contentDescription = null,
                                         modifier = Modifier.size(64.dp),
-                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                        tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f)
                                     )
                                     Spacer(modifier = Modifier.height(16.dp))
                                     Text(
@@ -4768,13 +5072,12 @@ fun SchedulePage(navController: NavHostController) {
                     }
                 }
 
-                // Add new schedule button
                 FloatingActionButton(
                     onClick = { showScheduleDialog = true },
                     modifier = Modifier
                         .align(Alignment.End)
                         .padding(16.dp),
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.secondary
                 ) {
                     Icon(
                         Icons.Default.Add,
@@ -4786,7 +5089,6 @@ fun SchedulePage(navController: NavHostController) {
         }
     }
 
-    // Delete confirmation dialog
     showDeleteConfirmation?.let { schedule ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirmation = null },
@@ -4827,15 +5129,12 @@ fun SchedulePage(navController: NavHostController) {
         )
     }
 
-    // Show schedule creation dialog
     if (showScheduleDialog) {
         EnhancedScheduleDialog(
             onDismiss = { showScheduleDialog = false },
-            // Leave deviceName and deviceType as defaults since user will select in dialog
             onSaveSchedule = { scheduleString ->
                 try {
                     deviceManager.saveSchedule(scheduleString)
-                    // Optional: Show a toast confirmation
                     Toast.makeText(context, "Schedule created", Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
                     Log.e("SchedulePage", "Error saving schedule: ${e.message}", e)
@@ -4844,6 +5143,7 @@ fun SchedulePage(navController: NavHostController) {
         )
     }
 }
+
 
 @Composable
 fun ScheduleItem(
@@ -4887,7 +5187,7 @@ fun ScheduleItem(
                 modifier = Modifier
                     .size(24.dp)
                     .padding(end = 8.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.secondary
             )
 
             // Schedule description
@@ -5303,12 +5603,12 @@ fun EnhancedScheduleDialog(
                                 modifier = Modifier.weight(1f).padding(end = 4.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (selectedDays.size == 7)
-                                        MaterialTheme.colorScheme.primary
+                                        MaterialTheme.colorScheme.secondary
                                     else
                                         MaterialTheme.colorScheme.secondary
                                 )
                             ) {
-                                Text("Every Day")
+                                Text("Every Day", fontSize = 12.sp)
                             }
 
                             Button(
@@ -5318,12 +5618,12 @@ fun EnhancedScheduleDialog(
                                 modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (selectedDays == setOf("MON", "TUE", "WED", "THU", "FRI"))
-                                        MaterialTheme.colorScheme.primary
+                                        MaterialTheme.colorScheme.secondary
                                     else
                                         MaterialTheme.colorScheme.secondary
                                 )
                             ) {
-                                Text("Weekdays")
+                                Text("Weekdays", fontSize = 12.sp)
                             }
 
                             Button(
@@ -5333,12 +5633,12 @@ fun EnhancedScheduleDialog(
                                 modifier = Modifier.weight(1f).padding(start = 4.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (selectedDays == setOf("SAT", "SUN"))
-                                        MaterialTheme.colorScheme.primary
+                                        MaterialTheme.colorScheme.secondary
                                     else
                                         MaterialTheme.colorScheme.secondary
                                 )
                             ) {
-                                Text("Weekend")
+                                Text("Weekend", fontSize = 12.sp)
                             }
                         }
 
@@ -5563,7 +5863,7 @@ fun EnhancedScheduleDialog(
                                     imageVector = Icons.Default.LightMode,
                                     contentDescription = "High brightness",
                                     modifier = Modifier.size(24.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = MaterialTheme.colorScheme.secondary
                                 )
                             }
                         }
@@ -5635,7 +5935,7 @@ fun EnhancedScheduleDialog(
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.secondary
                 ),
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
@@ -5652,7 +5952,7 @@ fun EnhancedScheduleDialog(
             OutlinedButton(
                 onClick = onDismiss,
                 colors = ButtonDefaults.outlinedButtonColors(),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.secondary),
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
                 Text("Cancel")
@@ -5748,7 +6048,7 @@ fun EnhancedScheduleDialog(
                                             .border(
                                                 width = 2.dp,
                                                 color = if (Color(red, green, blue) == color)
-                                                    MaterialTheme.colorScheme.primary else Color.Transparent,
+                                                    MaterialTheme.colorScheme.secondary else Color.Transparent,
                                                 shape = CircleShape
                                             )
                                             .clickable {
