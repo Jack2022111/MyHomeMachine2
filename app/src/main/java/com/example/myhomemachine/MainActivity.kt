@@ -983,10 +983,10 @@ fun FirstScreen(navController: NavHostController) {
                 contentAlignment = Alignment.Center
             ) {
                 Image(
-                    painter = painterResource(id = R.drawable.logo),
+                    painter = painterResource(id = R.drawable.logo2),
                     contentDescription = "App Logo",
                     modifier = Modifier
-                        .size(200.dp)
+                        .size(300.dp)
                         .padding(16.dp),
                     contentScale = ContentScale.Fit
                 )
@@ -1028,9 +1028,13 @@ fun FirstScreen(navController: NavHostController) {
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
                     elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp,
+                        focusedElevation = 0.dp,
+                        hoveredElevation = 0.dp,
+                        disabledElevation = 0.dp
                     )
+
                 ) {
                     Icon(
                         imageVector = Icons.Default.Person,
@@ -1054,9 +1058,13 @@ fun FirstScreen(navController: NavHostController) {
                         containerColor = MaterialTheme.colorScheme.secondary
                     ),
                     elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
+                        defaultElevation = 0.dp,
+                        pressedElevation = 0.dp,
+                        focusedElevation = 0.dp,
+                        hoveredElevation = 0.dp,
+                        disabledElevation = 0.dp
                     )
+
                 ) {
                     Icon(
                         imageVector = Icons.Default.AccountCircle,
@@ -2556,7 +2564,7 @@ private fun DeviceCategoryCard(
             .heightIn(min = if (showDeviceList) 180.dp else 140.dp)
             .fillMaxWidth()
             .shadow(4.dp),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(5.dp),
         onClick = onClick,
         colors = CardDefaults.elevatedCardColors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer
