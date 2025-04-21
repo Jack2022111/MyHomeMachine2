@@ -1,5 +1,5 @@
 package com.example.myhomemachine
-
+import androidx.compose.material.icons.filled.AutoAwesome
 import android.Manifest.permission
 import android.app.Application as AndroidApplication
 // for the Notification in the plug
@@ -249,7 +249,16 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.OutlinedTextFieldDefaults
-
+import com.example.myhomemachine.data.UsageTrackingManager
+import androidx.compose.material3.Badge
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.offset
 
 // lifx stuff super unsecure
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
@@ -290,7 +299,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var deviceController: DeviceController
     lateinit var retrofitClient: RetrofitClient
 
-
+    private lateinit var usageTrackingManager: UsageTrackingManager
     private val channelId = "i.apps.notifications" // Unique channel ID for notifications
     private val description = "Test notification"  // Description for the notification channel
     private val notificationId = 1234 // Unique identifier for the notification
@@ -304,7 +313,7 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestPermissions()
         createNotificationChannel()
 
-
+        usageTrackingManager = UsageTrackingManager(this)
         //sendNotification("Welcome to My Home", "Notification is working")
 
         // Initialize SessionManager and PersistentDeviceManager
@@ -556,6 +565,13 @@ class MainActivity : AppCompatActivity() {
                 Log.d("LIFX", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
                 sendNotification("Light Devices", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
 
+                // Track usage
+                usageTrackingManager.trackDeviceUsage(
+                    deviceName = "LIFX Smart Light",
+                    deviceType = "Light",
+                    action = "ON"
+                )
+
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light on", e)
             }
@@ -573,9 +589,16 @@ class MainActivity : AppCompatActivity() {
                     authHeader = "Bearer $LIFX_API_TOKEN",
                     body = body
                 )
-                isLightOn = false // ✅ Make sure this updates correctly
+                isLightOn = false
                 Log.d("LIFX", "Light turned OFF")
                 sendNotification("Light Devices", "Light turned OFF")
+
+                // Track usage
+                usageTrackingManager.trackDeviceUsage(
+                    deviceName = "LIFX Smart Light",
+                    deviceType = "Light",
+                    action = "OFF"
+                )
 
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
@@ -601,6 +624,15 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 Log.d("LIFX", "Brightness set to $brightness")
+
+                // Track usage with brightness value
+                usageTrackingManager.trackDeviceUsage(
+                    deviceName = "LIFX Smart Light",
+                    deviceType = "Light",
+                    action = "SET_BRIGHTNESS",
+                    value = (brightness * 100).toInt().toString()
+                )
+
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to set brightness", e)
             }
@@ -634,6 +666,15 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 Log.d("LIFX", "Color set to HSB: ${hsb[0]}, ${hsb[1]}, ${hsb[2]}")
+
+                // Track usage with color value
+                usageTrackingManager.trackDeviceUsage(
+                    deviceName = "LIFX Smart Light",
+                    deviceType = "Light",
+                    action = "SET_COLOR",
+                    value = "#" + Integer.toHexString(color.toArgb()).substring(2)
+                )
+
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to set color", e)
             }
@@ -673,7 +714,7 @@ class DeviceController (private val context: Context) {
 
     private val client = OkHttpClient()
     private val deviceNotifier = DeviceNotificationManager(context)
-
+    private val usageTrackingManager = UsageTrackingManager(context)
     //private val shellyIpAddress = "http://10.5.2.30" // Shelly plug IP (this is specifically for b2 wifi network it will change later)
 
     // Function to turn on the Shelly Plug
@@ -683,8 +724,15 @@ class DeviceController (private val context: Context) {
             deviceType = DeviceType.PLUG,
             eventType = EventType.STATUS_CHANGE,
             deviceName = "Shelly Plug",
-            additionalDetails = "Plug turned ON")
+            additionalDetails = "Plug turned ON"
+        )
 
+        // Track usage
+        usageTrackingManager.trackDeviceUsage(
+            deviceName = "Shelly Plug",
+            deviceType = "Plug",
+            action = "ON"
+        )
     }
 
 
@@ -695,7 +743,15 @@ class DeviceController (private val context: Context) {
             deviceType = DeviceType.PLUG,
             eventType = EventType.STATUS_CHANGE,
             deviceName = "Shelly Plug",
-            additionalDetails = "Plug turned OFF")
+            additionalDetails = "Plug turned OFF"
+        )
+
+        // Track usage
+        usageTrackingManager.trackDeviceUsage(
+            deviceName = "Shelly Plug",
+            deviceType = "Plug",
+            action = "OFF"
+        )
     }
 
 
@@ -2669,7 +2725,7 @@ private fun BottomButtons(navController: NavHostController) {
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 20.dp, start = 20.dp, end = 20.dp), // ← fixed position
+                .padding(bottom = 20.dp, start = 20.dp, end = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedButton(
@@ -2679,7 +2735,6 @@ private fun BottomButtons(navController: NavHostController) {
             ) {
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                //Text("Schedule", style = MaterialTheme.typography.labelLarge)
             }
 
             Button(
@@ -2692,15 +2747,47 @@ private fun BottomButtons(navController: NavHostController) {
                 Text("Add Device", style = MaterialTheme.typography.labelLarge)
             }
 
-            OutlinedButton( // AI BUTTON
-                onClick = { navController.navigate("settings") },
-                //onClick = { navController.navigate("aiscreen") },
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(Icons.Default.CoPresent, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                //Text("Profile", style = MaterialTheme.typography.labelLarge)
+            // Smart suggestions button with badge
+            Box(modifier = Modifier.weight(1f)) {
+                // Get context first, then use it
+                val context = LocalContext.current
+                val usageTrackingManager = remember { UsageTrackingManager(context) }
+                var suggestionCount by remember { mutableStateOf(0) }
+
+                // Update count when screen appears
+                LaunchedEffect(Unit) {
+                    suggestionCount = usageTrackingManager.getSavedSuggestions().size
+                }
+
+                OutlinedButton(
+                    onClick = { navController.navigate("suggestions") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Show badge if suggestions available
+                if (suggestionCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = (-8).dp, end = (-8).dp)
+                    ) {
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.error
+                        ) {
+                            Text(
+                                text = suggestionCount.toString(),
+                                color = MaterialTheme.colorScheme.onError
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -6197,7 +6284,9 @@ fun MyNavHost(
         composable("forgot-password") {
             ForgotPasswordScreen(navController)
         }
-
+        composable("suggestions") {
+            SuggestionsScreen(navController)
+        }
         composable(
             route = "reset-password-verify/{email}",
             arguments = listOf(

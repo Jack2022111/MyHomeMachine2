@@ -11,6 +11,12 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
+import numpy as np
+from datetime import datetime, timedelta
+import json
+from collections import defaultdict
+import uuid
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -674,6 +680,253 @@ def confirm_account_deletion():
             "success": False,
             "message": str(e)
         }), 500
+    
+
+#Ai Part
+
+# Create a dictionary to store usage data
+usage_data = defaultdict(list)
+suggestions = []
+
+@app.route('/api/usage/track', methods=['POST'])
+def track_usage():
+    try:
+        data = request.get_json()
+        events = data.get('events', [])
+        
+        if not events:
+            return jsonify({
+                "success": False,
+                "message": "No events provided"
+            }), 400
+        
+        # Store events in memory (in a real app, store in database)
+        for event in events:
+            device_id = event.get('deviceId')
+            device_name = event.get('deviceName')
+            device_type = event.get('deviceType')
+            action = event.get('action')
+            value = event.get('value', '')
+            timestamp = event.get('timestamp')
+            
+            if not all([device_id, device_name, device_type, action, timestamp]):
+                continue
+                
+            usage_data[device_id].append({
+                'device_name': device_name,
+                'device_type': device_type,
+                'action': action,
+                'value': value,
+                'timestamp': timestamp
+            })
+        
+        # Analyze patterns after collecting data
+        analyze_patterns()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Tracked {len(events)} events"
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Exception during usage tracking: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
+
+@app.route('/api/usage/suggestions', methods=['GET'])
+def get_suggestions():
+    try:
+        return jsonify({
+            "success": True,
+            "suggestions": suggestions
+        }), 200
+    except Exception as e:
+        logger.exception(f"Exception getting suggestions: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
+
+@app.route('/api/usage/suggestion/response', methods=['POST'])
+def handle_suggestion_response():
+    try:
+        data = request.get_json()
+        suggestion_id = data.get('suggestionId')
+        accepted = data.get('accepted', False)
+        
+        if not suggestion_id:
+            return jsonify({
+                "success": False,
+                "message": "No suggestion ID provided"
+            }), 400
+            
+        # Remove the suggestion from the list
+        global suggestions
+        suggestions = [s for s in suggestions if s['id'] != suggestion_id]
+        
+        # If accepted, we could refine our model
+        # If rejected, we could note this to avoid similar suggestions
+        
+        return jsonify({
+            "success": True,
+            "message": "Suggestion response recorded"
+        }), 200
+        
+    except Exception as e:
+        logger.exception(f"Exception handling suggestion response: {e}")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500
+
+def analyze_patterns():
+    """
+    Analyze device usage patterns and generate automation suggestions
+    """
+    try:
+        global suggestions
+        new_suggestions = []
+        
+        # For each device with enough data
+        for device_id, events in usage_data.items():
+            if len(events) < 5:  # Need at least 5 events to detect patterns
+                continue
+                
+            # Get the most recent events (last 2 weeks)
+            two_weeks_ago = datetime.now() - timedelta(days=14)
+            recent_events = [e for e in events if e['timestamp'] > two_weeks_ago.timestamp() * 1000]
+            
+            if len(recent_events) < 5:
+                continue
+                
+            # Group events by action
+            actions = {}
+            for action in ['ON', 'OFF', 'SET_BRIGHTNESS', 'SET_COLOR']:
+                action_events = [e for e in recent_events if e['action'] == action]
+                if action_events:
+                    actions[action] = action_events
+            
+            # Analyze ON events for time patterns
+            if 'ON' in actions and len(actions['ON']) >= 3:
+                on_times = []
+                on_day_of_week = []
+                
+                for event in actions['ON']:
+                    event_time = datetime.fromtimestamp(event['timestamp'] / 1000)
+                    on_times.append(event_time.hour * 60 + event_time.minute)  # Time as minutes since midnight
+                    on_day_of_week.append(event_time.weekday())  # 0=Monday, 6=Sunday
+                
+                # Find clusters of times
+                hour_clusters = cluster_times(on_times, 30)  # 30 minutes tolerance
+                
+                for cluster_time, frequency in hour_clusters.items():
+                    # If there's a clear pattern (used 3+ times at similar times)
+                    if frequency >= 3:
+                        # Get the hour and minute
+                        hour = cluster_time // 60
+                        minute = cluster_time % 60
+                        
+                        # Format as 12-hour time
+                        ampm = "AM" if hour < 12 else "PM"
+                        hour12 = hour if hour <= 12 else hour - 12
+                        hour12 = 12 if hour12 == 0 else hour12
+                        time_str = f"{hour12}:{minute:02d} {ampm}"
+                        
+                        # Find what days this happens on
+                        day_counts = defaultdict(int)
+                        for day in on_day_of_week:
+                            day_counts[day] += 1
+                        
+                        # If pattern appears on specific days
+                        frequent_days = []
+                        day_names = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+                        
+                        for day, count in day_counts.items():
+                            if count >= 2:  # At least twice on this day
+                                frequent_days.append(day_names[day])
+                        
+                        # If no specific days, assume all days
+                        if not frequent_days:
+                            frequent_days = day_names
+                        
+                        # Create a suggestion
+                        sample_event = actions['ON'][0]
+                        confidence = min(0.95, frequency / len(actions['ON']) * 0.8 + 0.2)  # Cap at 95%
+                        
+                        # Format days for display
+                        days_text = "every day" if len(frequent_days) == 7 else on_days_list(frequent_days)
+                        
+                        suggestion = {
+                            "id": str(uuid.uuid4()),
+                            "deviceId": device_id,
+                            "deviceName": sample_event['device_name'],
+                            "deviceType": sample_event['device_type'],
+                            "action": "ON",
+                            "timeOfDay": time_str,
+                            "daysOfWeek": frequent_days,
+                            "confidence": confidence,
+                            "description": f"Turn on {sample_event['device_name']} at {time_str} {days_text}"
+                        }
+                        
+                        new_suggestions.append(suggestion)
+            
+            # TODO: Similarly analyze OFF events and other actions for patterns
+        
+        # Set the global suggestions, keeping any that weren't in devices we just analyzed
+        analyzed_device_ids = set(usage_data.keys())
+        existing_different_device_suggestions = [
+            s for s in suggestions 
+            if s['deviceId'] not in analyzed_device_ids
+        ]
+        
+        suggestions = existing_different_device_suggestions + new_suggestions
+        
+    except Exception as e:
+        logger.exception(f"Error analyzing patterns: {e}")
+
+def cluster_times(times, tolerance_minutes):
+    """
+    Group similar times together and count frequencies
+    """
+    clusters = defaultdict(int)
+    
+    for time in times:
+        # Find closest existing cluster
+        closest = None
+        min_distance = float('inf')
+        
+        for center in clusters.keys():
+            # Calculate circular distance (to handle midnight wrapping)
+            distance = min(
+                abs(time - center),
+                1440 - abs(time - center)  # 1440 = minutes in a day
+            )
+            
+            if distance < min_distance:
+                min_distance = distance
+                closest = center
+        
+        # If within tolerance, add to closest cluster
+        if closest is not None and min_distance <= tolerance_minutes:
+            clusters[closest] += 1
+        else:
+            # Create new cluster
+            clusters[time] = 1
+    
+    return clusters
+
+def on_days_list(days):
+    """Format a list of days for readable display"""
+    if len(days) == 5 and all(d in days for d in ["MON", "TUE", "WED", "THU", "FRI"]):
+        return "on weekdays"
+    elif len(days) == 2 and all(d in days for d in ["SAT", "SUN"]):
+        return "on weekends"
+    else:
+        return "on " + ", ".join(days)
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
