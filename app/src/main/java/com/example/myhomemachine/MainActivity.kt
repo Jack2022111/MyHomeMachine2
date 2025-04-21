@@ -1,26 +1,40 @@
 package com.example.myhomemachine
 
-import android.Manifest.permission
-import android.app.Application as AndroidApplication
 // for the Notification in the plug
-import com.example.myhomemachine.DeviceType
-import com.example.myhomemachine.EventType
 
 
+import android.Manifest
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresPermission
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.TextField
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,18 +47,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CoPresent
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
@@ -57,28 +81,35 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ToggleOff
+import androidx.compose.material.icons.filled.ToggleOn
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WbSunny
-import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -93,22 +124,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.animation.*
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -116,139 +148,50 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.myhomemachine.data.DeviceManager
+import com.example.myhomemachine.data.PersistentDeviceManager
+import com.example.myhomemachine.network.AuthViewModel
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
+import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofencingClient
+import com.google.android.gms.location.GeofencingRequest
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import java.io.IOException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.*
-import android.util.Log
-import androidx.fragment.app.FragmentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.compose.rememberNavController
-import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
-import android.provider.Settings
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.net.wifi.WifiNetworkSpecifier
-import android.net.ConnectivityManager
-import android.net.NetworkRequest
-import android.os.Build
-import androidx.annotation.RequiresApi
-import android.content.Intent
-import android.net.Network
-import android.net.NetworkCapabilities
-import androidx.compose.foundation.border
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.activity.viewModels
-import androidx.lifecycle.ViewModelProvider
-
-import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.compose.runtime.remember
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.myhomemachine.network.AuthViewModel
-import com.example.myhomemachine.SettingsScreen
-import androidx.navigation.navArgument
-import androidx.navigation.NavType
-import com.example.myhomemachine.ForgotPasswordScreen
-import com.example.myhomemachine.data.PersistentDeviceManager
-import com.example.myhomemachine.SessionManager
-
-
-import androidx.navigation.navArgument
-import androidx.compose.foundation.text.KeyboardOptions
-import com.example.myhomemachine.VerificationType
-import com.example.myhomemachine.CodeVerificationScreen
-import com.example.myhomemachine.ResetPasswordConfirmScreen
-import java.util.UUID
-import android.widget.TextView
-import com.example.myhomemachine.RetrofitClient
-import com.example.myhomemachine.SwitchBotResponse
-import com.example.myhomemachine.DeviceStatus
-import com.example.myhomemachine.SwitchBotApiService
-import retrofit2.*
+import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import kotlin.math.ln
+import java.io.IOException
+import java.util.UUID
 import kotlin.math.exp
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.nativeCanvas
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import androidx.core.app.NotificationCompat
-import androidx.compose.ui.platform.LocalContext
-import android.app.PendingIntent
-import androidx.core.app.NotificationManagerCompat
-import android.content.BroadcastReceiver
-
-import android.content.IntentFilter
-import com.example.myhomemachine.service.ScheduleService
-import com.example.myhomemachine.data.Schedule
-import java.time.DayOfWeek
-import java.time.LocalTime
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.RadioButton
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.shape.CircleShape
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import kotlin.math.ln
+import kotlin.math.roundToInt
 
 
 // lifx stuff super unsecure
@@ -295,15 +238,18 @@ class MainActivity : AppCompatActivity() {
     private val description = "Test notification"  // Description for the notification channel
     private val notificationId = 1234 // Unique identifier for the notification
     private  val CHANNEL_ID = "my_channel_id"
+    lateinit var geofencingClient: GeofencingClient
 
     @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deviceController = DeviceController(this)
-        retrofitClient = RetrofitClient()
+        retrofitClient = RetrofitClient
         checkAndRequestPermissions()
         createNotificationChannel()
 
+        geofencingClient = LocationServices.getGeofencingClient(this)
+        setupDynamicGeofence()
 
         //sendNotification("Welcome to My Home", "Notification is working")
 
@@ -338,11 +284,87 @@ class MainActivity : AppCompatActivity() {
                         onSetColor = { color -> setColor(color) },
                         sessionManager = sessionManager,  // Pass SessionManager to NavHost
                         deviceManager = deviceManager,     // Pass DeviceManager to NavHost
-                        deviceController = deviceController
-                    )
+                        deviceController = deviceController)
                 }
             }
         }
+    }
+
+    fun setupDynamicGeofence() {
+        val fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.e("Geofence", "Location permission not granted")
+            return
+        }
+
+        val locationRequest = LocationRequest.create().apply {
+            interval = 1000
+            fastestInterval = 500
+            priority = Priority.PRIORITY_HIGH_ACCURACY
+            numUpdates = 1 // ✅ Only need one location update
+        }
+
+        fusedLocationProviderClient.requestLocationUpdates(
+            locationRequest,
+            object : LocationCallback() {
+                @RequiresPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                override fun onLocationResult(result: LocationResult) {
+                    val location = result.lastLocation ?: return
+
+                    val geofence = Geofence.Builder()
+                        .setRequestId("home_geofence")
+                        .setCircularRegion(
+                            location.latitude,
+                            location.longitude,
+                            50f
+                        )
+                        .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                        .setTransitionTypes(
+                            Geofence.GEOFENCE_TRANSITION_ENTER or Geofence.GEOFENCE_TRANSITION_EXIT
+                        )
+                        .build()
+
+                    val geofenceRequest = GeofencingRequest.Builder()
+                        .setInitialTrigger(
+                            GeofencingRequest.INITIAL_TRIGGER_ENTER or GeofencingRequest.INITIAL_TRIGGER_EXIT
+                        )
+                        .addGeofence(geofence)
+                        .build()
+
+                    val intent = Intent(this@MainActivity, GeofenceBroadcastReceiver::class.java)
+
+                    val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+                    } else {
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    }
+
+                    val pendingIntent = PendingIntent.getBroadcast(
+                        this@MainActivity,
+                        1001,
+                        intent,
+                        flags
+                    )
+
+                    geofencingClient.addGeofences(geofenceRequest, pendingIntent)
+                        .addOnSuccessListener {
+                            Log.d("Geofence", "Geofence added at: ${location.latitude}, ${location.longitude}")
+                            Toast.makeText(
+                                this@MainActivity,
+                                "Geofence set at: ${location.latitude}, ${location.longitude}",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                        .addOnFailureListener {
+                            Log.e("Geofence", "Failed to add geofence: ${it.message}")
+                        }
+                }
+            },
+            mainLooper
+        )
     }
 
     private fun createNotificationChannel() {
@@ -464,83 +486,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
-    // ✅ Fetch Temperature from SwitchBot API
-    /*
-    private fun fetchTemperature() {
-        val timestamp = System.currentTimeMillis().toString()
-        val nonce = UUID.randomUUID().toString()
-        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(OkHttpClient.Builder().build())
-            .build()
-
-        val apiService = retrofit.create(SwitchBotApiService::class.java)
-
-        apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp)
-            .enqueue(object : retrofit2.Callback<SwitchBotResponse> {
-                override fun onResponse(call: retrofit2.Call<SwitchBotResponse>, response: retrofit2.Response<SwitchBotResponse>) {
-                    if (response.isSuccessful) {
-                        val temp = response.body()?.body?.temperature ?: 0.0
-                        runOnUiThread {
-                            val temperatureTextView: TextView = findViewById(R.id.temperatureTextView)
-                            temperatureTextView.text = "Temperature: $temp °C"
-                        }
-                        Log.d("SwitchBot", "Temperature: $temp °C")
-                    } else {
-                        Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
-                    }
-                }
-
-                override fun onFailure(call: retrofit2.Call<SwitchBotResponse>, t: Throwable) {
-                    Log.e("SwitchBot", "Failed to fetch temperature", t)
-                }
-            })
-    }
-
-     */
-    /*
-        suspend fun fetchTemperature(): Double? {
-            val timestamp = System.currentTimeMillis().toString()
-            val nonce = UUID.randomUUID().toString()
-            val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
-
-            val retrofit = Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .addConverterFactory(GsonConverterFactory.create())
-                .client(OkHttpClient.Builder().build())
-                .build()
-
-            val apiService = retrofit.create(SwitchBotApiService::class.java)
-
-            return try {
-                val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
-                if (response.isSuccessful) {
-                    response.body()?.body?.temperature?.toDouble() // ✅ Convert Float to Double
-                } else {
-                    Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
-                    null
-                }
-            } catch (e: Exception) {
-                Log.e("SwitchBot", "Failed to fetch temperature", e)
-                null
-            }
-        }
-
-        private fun generateSignature(token: String, secret: String, timestamp: String, nonce: String): String {
-            val data = token + timestamp + nonce
-            val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-            mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
-            return android.util.Base64.encodeToString(mac.doFinal(data.toByteArray()), android.util.Base64.NO_WRAP)
-        }
-
-     */
-
-
     private fun turnLightOn() {
         val apiService = retrofitClient.instance
         val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
@@ -641,24 +586,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkAndRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        val permissions = mutableListOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            permissions.add(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+
+        val permissionsToRequest = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (permissionsToRequest.isNotEmpty()) {
             ActivityCompat.requestPermissions(
                 this,
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                permissionsToRequest.toTypedArray(),
                 LOCATION_PERMISSION_REQUEST_CODE
             )
-        }
-        // Check for notification permission on Android 13 (Tiramisu) and higher.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    NOTIFICATION_PERMISSION_REQUEST_CODE
-                )
-            }
         }
     }
 

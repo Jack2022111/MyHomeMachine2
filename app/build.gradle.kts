@@ -103,6 +103,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.6.2")
     // For Encrypted SharedPreferences
     implementation("androidx.security:security-crypto-ktx:1.1.0-alpha06")
+    implementation(libs.play.services.location)
 
     // Test dependencies
     testImplementation(libs.junit)
