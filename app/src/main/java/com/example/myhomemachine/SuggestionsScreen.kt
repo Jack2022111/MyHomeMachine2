@@ -29,6 +29,7 @@ import com.example.myhomemachine.data.AutomationSuggestion
 import com.example.myhomemachine.data.UsageTrackingManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -153,6 +154,33 @@ fun SuggestionsScreen(navController: NavHostController) {
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                 modifier = Modifier.padding(horizontal = 32.dp)
                             )
+
+                            // Add this test button
+                            Spacer(modifier = Modifier.height(32.dp))
+
+                            Button(
+                                onClick = {
+                                    // Create a test suggestion
+                                    val testSuggestion = AutomationSuggestion(
+                                        id = UUID.randomUUID().toString(),
+                                        deviceId = "light_lifx_smart_light",
+                                        deviceName = "LIFX Smart Light",
+                                        deviceType = "Light",
+                                        action = "ON",
+                                        timeOfDay = "8:00 AM",
+                                        daysOfWeek = listOf("MON", "TUE", "WED", "THU", "FRI"),
+                                        confidence = 0.85f,
+                                        description = "Turn on LIFX Smart Light at 8:00 AM on weekdays"
+                                    )
+
+                                    // Save it locally
+                                    val testSuggestions = suggestions.toMutableList()
+                                    testSuggestions.add(testSuggestion)
+                                    suggestions = testSuggestions
+                                }
+                            ) {
+                                Text("Create Test Suggestion")
+                            }
                         }
                     }
                 } else {

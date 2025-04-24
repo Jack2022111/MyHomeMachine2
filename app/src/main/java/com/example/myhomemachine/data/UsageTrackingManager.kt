@@ -22,7 +22,7 @@ class UsageTrackingManager(private val context: Context) {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
     private val gson = Gson()
-    private val BASE_URL = "http://10.0.2.2:5000/api"  // Change to your server address
+    private val BASE_URL = "http://10.0.2.2:5000/api"
 
     companion object {
         private const val KEY_PENDING_EVENTS = "pending_events"
