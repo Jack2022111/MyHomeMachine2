@@ -1,26 +1,38 @@
 package com.example.myhomemachine
-import androidx.compose.material.icons.filled.AutoAwesome
-import android.Manifest.permission
-import android.app.Application as AndroidApplication
+
 // for the Notification in the plug
-import com.example.myhomemachine.DeviceType
-import com.example.myhomemachine.EventType
 
 
+import android.Manifest
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.TextField
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,18 +45,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CoPresent
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
@@ -57,28 +79,35 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ToggleOff
+import androidx.compose.material.icons.filled.ToggleOn
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WbSunny
-import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -93,22 +122,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.animation.*
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -116,149 +146,44 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.myhomemachine.data.DeviceManager
+import com.example.myhomemachine.data.PersistentDeviceManager
+import com.example.myhomemachine.network.AuthViewModel
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import java.io.IOException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.*
-import android.util.Log
-import androidx.fragment.app.FragmentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.compose.rememberNavController
-import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
-import android.provider.Settings
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.net.wifi.WifiNetworkSpecifier
-import android.net.ConnectivityManager
-import android.net.NetworkRequest
-import android.os.Build
-import androidx.annotation.RequiresApi
-import android.content.Intent
-import android.net.Network
-import android.net.NetworkCapabilities
-import androidx.compose.foundation.border
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.activity.viewModels
-import androidx.lifecycle.ViewModelProvider
-
-import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.compose.runtime.remember
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.myhomemachine.network.AuthViewModel
-import com.example.myhomemachine.SettingsScreen
-import androidx.navigation.navArgument
-import androidx.navigation.NavType
-import com.example.myhomemachine.ForgotPasswordScreen
-import com.example.myhomemachine.data.PersistentDeviceManager
-import com.example.myhomemachine.SessionManager
-
-
-import androidx.navigation.navArgument
-import androidx.compose.foundation.text.KeyboardOptions
-import com.example.myhomemachine.VerificationType
-import com.example.myhomemachine.CodeVerificationScreen
-import com.example.myhomemachine.ResetPasswordConfirmScreen
-import java.util.UUID
-import android.widget.TextView
-import com.example.myhomemachine.RetrofitClient
-import com.example.myhomemachine.SwitchBotResponse
-import com.example.myhomemachine.DeviceStatus
-import com.example.myhomemachine.SwitchBotApiService
-import retrofit2.*
+import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import kotlin.math.ln
+import java.io.IOException
+import java.util.UUID
 import kotlin.math.exp
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.nativeCanvas
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import androidx.core.app.NotificationCompat
-import androidx.compose.ui.platform.LocalContext
-import android.app.PendingIntent
-import androidx.core.app.NotificationManagerCompat
-import android.content.BroadcastReceiver
+import kotlin.math.ln
+import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.Close
 
-import android.content.IntentFilter
-import com.example.myhomemachine.service.ScheduleService
-import com.example.myhomemachine.data.Schedule
-import java.time.DayOfWeek
-import java.time.LocalTime
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.RadioButton
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.shape.CircleShape
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import com.example.myhomemachine.data.UsageTrackingManager
-import androidx.compose.material3.Badge
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.unit.offset
 
 // lifx stuff super unsecure
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
@@ -299,7 +224,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var deviceController: DeviceController
     lateinit var retrofitClient: RetrofitClient
 
-    private lateinit var usageTrackingManager: UsageTrackingManager
+
     private val channelId = "i.apps.notifications" // Unique channel ID for notifications
     private val description = "Test notification"  // Description for the notification channel
     private val notificationId = 1234 // Unique identifier for the notification
@@ -313,7 +238,7 @@ class MainActivity : AppCompatActivity() {
         checkAndRequestPermissions()
         createNotificationChannel()
 
-        usageTrackingManager = UsageTrackingManager(this)
+
         //sendNotification("Welcome to My Home", "Notification is working")
 
         // Initialize SessionManager and PersistentDeviceManager
@@ -473,83 +398,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
-
-    // ✅ Fetch Temperature from SwitchBot API
-    /*
-    private fun fetchTemperature() {
-        val timestamp = System.currentTimeMillis().toString()
-        val nonce = UUID.randomUUID().toString()
-        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(OkHttpClient.Builder().build())
-            .build()
-
-        val apiService = retrofit.create(SwitchBotApiService::class.java)
-
-        apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp)
-            .enqueue(object : retrofit2.Callback<SwitchBotResponse> {
-                override fun onResponse(call: retrofit2.Call<SwitchBotResponse>, response: retrofit2.Response<SwitchBotResponse>) {
-                    if (response.isSuccessful) {
-                        val temp = response.body()?.body?.temperature ?: 0.0
-                        runOnUiThread {
-                            val temperatureTextView: TextView = findViewById(R.id.temperatureTextView)
-                            temperatureTextView.text = "Temperature: $temp °C"
-                        }
-                        Log.d("SwitchBot", "Temperature: $temp °C")
-                    } else {
-                        Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
-                    }
-                }
-
-                override fun onFailure(call: retrofit2.Call<SwitchBotResponse>, t: Throwable) {
-                    Log.e("SwitchBot", "Failed to fetch temperature", t)
-                }
-            })
-    }
-
-     */
-    /*
-        suspend fun fetchTemperature(): Double? {
-            val timestamp = System.currentTimeMillis().toString()
-            val nonce = UUID.randomUUID().toString()
-            val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
-
-            val retrofit = Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .addConverterFactory(GsonConverterFactory.create())
-                .client(OkHttpClient.Builder().build())
-                .build()
-
-            val apiService = retrofit.create(SwitchBotApiService::class.java)
-
-            return try {
-                val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
-                if (response.isSuccessful) {
-                    response.body()?.body?.temperature?.toDouble() // ✅ Convert Float to Double
-                } else {
-                    Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
-                    null
-                }
-            } catch (e: Exception) {
-                Log.e("SwitchBot", "Failed to fetch temperature", e)
-                null
-            }
-        }
-
-        private fun generateSignature(token: String, secret: String, timestamp: String, nonce: String): String {
-            val data = token + timestamp + nonce
-            val mac = javax.crypto.Mac.getInstance("HmacSHA256")
-            mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
-            return android.util.Base64.encodeToString(mac.doFinal(data.toByteArray()), android.util.Base64.NO_WRAP)
-        }
-
-     */
-
-
     private fun turnLightOn() {
         val apiService = retrofitClient.instance
         val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
@@ -564,13 +412,6 @@ class MainActivity : AppCompatActivity() {
                 isLightOn = true
                 Log.d("LIFX", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
                 sendNotification("Light Devices", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
-
-                // Track usage
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "ON"
-                )
 
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light on", e)
@@ -592,13 +433,6 @@ class MainActivity : AppCompatActivity() {
                 isLightOn = false
                 Log.d("LIFX", "Light turned OFF")
                 sendNotification("Light Devices", "Light turned OFF")
-
-                // Track usage
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "OFF"
-                )
 
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
@@ -624,15 +458,6 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 Log.d("LIFX", "Brightness set to $brightness")
-
-                // Track usage with brightness value
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "SET_BRIGHTNESS",
-                    value = (brightness * 100).toInt().toString()
-                )
-
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to set brightness", e)
             }
@@ -666,15 +491,6 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 Log.d("LIFX", "Color set to HSB: ${hsb[0]}, ${hsb[1]}, ${hsb[2]}")
-
-                // Track usage with color value
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "SET_COLOR",
-                    value = "#" + Integer.toHexString(color.toArgb()).substring(2)
-                )
-
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to set color", e)
             }
@@ -714,7 +530,7 @@ class DeviceController (private val context: Context) {
 
     private val client = OkHttpClient()
     private val deviceNotifier = DeviceNotificationManager(context)
-    private val usageTrackingManager = UsageTrackingManager(context)
+
     //private val shellyIpAddress = "http://10.5.2.30" // Shelly plug IP (this is specifically for b2 wifi network it will change later)
 
     // Function to turn on the Shelly Plug
@@ -724,15 +540,8 @@ class DeviceController (private val context: Context) {
             deviceType = DeviceType.PLUG,
             eventType = EventType.STATUS_CHANGE,
             deviceName = "Shelly Plug",
-            additionalDetails = "Plug turned ON"
-        )
+            additionalDetails = "Plug turned ON")
 
-        // Track usage
-        usageTrackingManager.trackDeviceUsage(
-            deviceName = "Shelly Plug",
-            deviceType = "Plug",
-            action = "ON"
-        )
     }
 
 
@@ -743,15 +552,7 @@ class DeviceController (private val context: Context) {
             deviceType = DeviceType.PLUG,
             eventType = EventType.STATUS_CHANGE,
             deviceName = "Shelly Plug",
-            additionalDetails = "Plug turned OFF"
-        )
-
-        // Track usage
-        usageTrackingManager.trackDeviceUsage(
-            deviceName = "Shelly Plug",
-            deviceType = "Plug",
-            action = "OFF"
-        )
+            additionalDetails = "Plug turned OFF")
     }
 
 
@@ -786,111 +587,6 @@ private fun generateSignature(token: String, secret: String, timestamp: String, 
     mac.init(javax.crypto.spec.SecretKeySpec(secret.toByteArray(), "HmacSHA256"))
     return android.util.Base64.encodeToString(mac.doFinal(data.toByteArray()), android.util.Base64.NO_WRAP)
 }
-
-
-
-/*
-suspend fun fetchTemperature(): Double? {
-    val timestamp = System.currentTimeMillis().toString()
-    val nonce = UUID.randomUUID().toString()
-    val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
-
-    val retrofit = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .addConverterFactory(GsonConverterFactory.create())
-        .client(OkHttpClient.Builder().build())
-        .build()
-
-    val apiService = retrofit.create(SwitchBotApiService::class.java)
-
-    return try {
-        val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
-
-        // ✅ Log the full API response to check for issues
-        Log.d("SwitchBot", "API Response: ${response.raw()}") // Logs raw HTTP response
-        Log.d("SwitchBot", "Response Body: ${response.body()}") // Logs response JSON
-
-        if (response.isSuccessful) {
-            val temp = response.body()?.body?.temperature
-            if (temp == null) {
-                Log.e("SwitchBot", "Temperature is null in response")
-                return null
-            }
-            Log.d("SwitchBot", "Received Temperature: $temp °C")
-            return temp.toDouble()
-        } else {
-            Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
-            null
-        }
-    } catch (e: Exception) {
-        Log.e("SwitchBot", "Failed to fetch temperature", e)
-        null
-    }
-}
-*/
-/*
-suspend fun forceCloudSync() {
-    withContext(Dispatchers.IO) {
-        val timestamp = System.currentTimeMillis().toString()
-        val nonce = UUID.randomUUID().toString()
-        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL) // e.g., "https://api.switch-bot.com/"
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(OkHttpClient.Builder().build())
-            .build()
-
-        val apiService = retrofit.create(SwitchBotApiService::class.java)
-
-        try {
-            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
-            Log.d("SwitchBot", "Cloud Sync Response: ${response.body()}")
-        } catch (e: Exception) {
-            Log.e("SwitchBot", "Failed to sync SwitchBot cloud", e)
-        }
-    }
-}
-
-
-suspend fun fetchTemperature(): Double? {
-    return withContext(Dispatchers.IO) {
-        val timestamp = System.currentTimeMillis().toString()
-        val nonce = UUID.randomUUID().toString()
-        val sign = generateSignature(sbtoken, sbsecret, timestamp, nonce)
-
-        Log.d("SwitchBot", "Sending API Request to: $BASE_URL/v1.1/devices/$sbdeviceId/status")
-        Log.d("SwitchBot", "Headers: Authorization=$sbtoken, sign=$sign, nonce=$nonce, t=$timestamp")
-
-        val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(OkHttpClient.Builder().build())
-            .build()
-
-        val apiService = retrofit.create(SwitchBotApiService::class.java)
-
-        try {
-            val response = apiService.getDeviceStatus(sbdeviceId, sbtoken, sign, nonce, timestamp).execute()
-            Log.d("SwitchBot", "API Response: ${response.raw()}")
-            Log.d("SwitchBot", "Response Body: ${response.body()}")
-
-            if (response.isSuccessful) {
-                val temp = response.body()?.body?.temperature
-                Log.d("SwitchBot", "Received Temperature: $temp °C")
-                temp?.toDouble()
-            } else {
-                Log.e("SwitchBot", "API Error: ${response.code()} - ${response.message()}")
-                null
-            }
-        } catch (e: Exception) {
-            Log.e("SwitchBot", "Failed to fetch temperature", e)
-            null
-        }
-    }
-}
-*/
-
 
 suspend fun forceCloudSync() {
     withContext(Dispatchers.IO) {
@@ -1020,6 +716,7 @@ suspend fun fetchMeterStatus(): MeterStatus? {
 
 @Composable
 fun FirstScreen(navController: NavHostController) {
+    var showTutorial by remember { mutableStateOf(true) }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -1048,7 +745,38 @@ fun FirstScreen(navController: NavHostController) {
                 )
             }
 
-            // Middle section with welcome text
+            if (showTutorial) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0069FF)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Box(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Welcome! Tap 'Sign Up' to create an account or 'Login' to continue.",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(end = 32.dp)
+                        )
+                        IconButton(
+                            onClick = { showTutorial = false },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+
+                // Middle section with welcome text
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -1155,33 +883,7 @@ fun FirstScreen(navController: NavHostController) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "DEV BYPASS",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-
-                Button(
-                    onClick = { navController.navigate("wififence") }, // to cracked version of geofence
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .animateContentSize(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    ),
-                    elevation = ButtonDefaults.buttonElevation(
-                        defaultElevation = 4.dp,
-                        pressedElevation = 8.dp
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Geofence test",
+                        text = "DEMO BYPASS",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -1286,78 +988,6 @@ fun WifiMonitorScreen(navController: NavHostController) {
         }
     }
 }
-
-
-/*
-// works
-@RequiresApi(Build.VERSION_CODES.M)
-@Composable
-fun WifiMonitorScreen(navController: NavHostController) {
-    val context = LocalContext.current
-    var connectionStatus by remember { mutableStateOf("Not connected to androidwifi") }
-
-    // Periodically check the Wi‑Fi connection status
-    LaunchedEffect(Unit) {
-        while (true) {
-            // Get WifiManager and ConnectivityManager
-            val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager?
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager?
-            val activeNetwork = connectivityManager?.activeNetworkInfo
-
-            if (activeNetwork != null &&
-                activeNetwork.isConnected &&
-                activeNetwork.type == ConnectivityManager.TYPE_WIFI) {
-                val wifiInfo = wifiManager?.connectionInfo
-                // Remove any surrounding quotes from the SSID (some devices return quotes)
-                val currentSSID = wifiInfo?.ssid?.replace("\"", "")
-                connectionStatus = if (currentSSID.equals("AndroidWifi", ignoreCase = true)) {
-                    "Connected to $currentSSID"
-                } else {
-                    "Not connected to androidwifi"
-                }
-            } else {
-                connectionStatus = "Not connected to androidwifi"
-            }
-            delay(5000L) // Check every 5 seconds
-        }
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(24.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Display the connection status
-            Text(
-                text = connectionStatus,
-                style = MaterialTheme.typography.headlineMedium
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Button to navigate back home
-            Button(
-                onClick = { navController.navigate("home") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text(text = "Go to Home")
-            }
-        }
-    }
-}
-
- */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @RequiresApi(Build.VERSION_CODES.M)
@@ -2080,213 +1710,6 @@ fun LoginScreen(navController: NavHostController) {
     }
 }
 
-
-/* 04-17-2025 working homescreen, welcomesection, devicegrid, devicecatcard, bottombuttons, devicecat class
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun HomeScreen(
-    navController: NavHostController,
-    sessionManager: SessionManager // Add this parameter
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("My Home Machine") },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                ),
-                actions = {
-                    // Settings icon
-                    IconButton(onClick = { navController.navigate("settings") }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Welcome section
-            WelcomeSection()
-
-            // Quick Actions Grid
-            DeviceGrid(navController)
-
-            // Bottom buttons
-            BottomButtons(navController)
-        }
-    }
-}
-
-@Composable
-private fun WelcomeSection() {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .shadow(4.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Welcome Home",
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Control your home environment with ease",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun DeviceGrid(navController: NavHostController) {
-    val deviceCategories = listOf(
-        DeviceCategory("Lights", Icons.Default.Lightbulb, "lights"),
-        DeviceCategory("Plugs", Icons.Default.PowerSettingsNew, "plugs"),
-        DeviceCategory("Cameras", Icons.Default.Videocam, "cameras"),
-        DeviceCategory("Sensors", Icons.Default.SensorsOff, "sensors")
-    )
-
-    Column(modifier = Modifier.padding(16.dp)) {
-        Text(
-            text = "Device Categories",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            deviceCategories.take(2).forEach { category ->
-                DeviceCategoryCard(
-                    category = category,
-                    modifier = Modifier.weight(1f),
-                    onClick = { navController.navigate(category.route) }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            deviceCategories.takeLast(2).forEach { category ->
-                DeviceCategoryCard(
-                    category = category,
-                    modifier = Modifier.weight(1f),
-                    onClick = { navController.navigate(category.route) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeviceCategoryCard(
-    category: DeviceCategory,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = modifier
-            .padding(4.dp)
-            .shadow(4.dp),
-        onClick = onClick
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = category.icon,
-                contentDescription = category.name,
-                modifier = Modifier.size(32.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = category.name,
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
-    }
-}
-
-@Composable
-private fun BottomButtons(navController: NavHostController) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        OutlinedButton(
-            onClick = { navController.navigate("schedule") },
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = 8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Schedule,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Schedule")
-        }
-
-        Button(
-            onClick = { navController.navigate("addDevice") },
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Add Device")
-        }
-    }
-}
-
-private data class DeviceCategory(
-    val name: String,
-    val icon: ImageVector,
-    val route: String
-)
-
-
- */
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -2296,6 +1719,9 @@ fun HomeScreen(
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit
 ) {
+    var showTutorial by remember { mutableStateOf(true) }
+    var isLightOn by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -2329,7 +1755,6 @@ fun HomeScreen(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.secondary,
-                            //Color(0xFF2196F3),
                             Color.White,
                             Color.White,
                             MaterialTheme.colorScheme.primary
@@ -2345,8 +1770,36 @@ fun HomeScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 100.dp) // so content doesn't hide behind the buttons
             ) {
+                // 🧠 Tutorial message
+                if (showTutorial) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0069FF)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Box(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Use the buttons below to add and control your smart devices!",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .padding(end = 32.dp)
+                            )
+                            IconButton(
+                                onClick = { showTutorial = false },
+                                modifier = Modifier.align(Alignment.TopEnd)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White)
+                            }
+                        }
+                    }
+                }
+
                 WelcomeSection()
-                var isLightOn by remember { mutableStateOf(false) }
+
                 DeviceGrid(
                     navController = navController,
                     deviceController = deviceController,
@@ -2362,11 +1815,11 @@ fun HomeScreen(
                 )
             }
 
-            BottomButtons(navController) // now absolutely positioned
+            BottomButtons(navController)
         }
-
     }
 }
+
 
 @Composable
 private fun WelcomeSection() {
@@ -2466,120 +1919,6 @@ private fun DeviceGrid(
         }
     }
 }
-
-/* working toggle switch light
-@Composable
-private fun DeviceCategoryCard(
-    category: DeviceCategory,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit,
-    isLightOn: Boolean = false, // 🔁 current light state
-    onTogglePower: (() -> Unit)? = null // 🔁 toggle logic
-) {
-    val supportsToggle = category.name in listOf("Lights", "Plugs")
-
-    // Static mock device list with initial ON/OFF state
-    val mockDevices = mapOf(
-        "Lights" to listOf("LIFX A19 Bulb" to true),
-        "Plugs" to listOf("Shelly Plug" to false),
-        "Cameras" to listOf("Raspberry PI" to true),
-        "Sensors" to listOf("SWITCHBOT sensor" to true)
-    )
-
-    val devices = mockDevices[category.name] ?: emptyList()
-
-    // Remembered local state for toggles (only for interactive ones)
-    val deviceStates = remember {
-        devices.map { (name, isOn) -> name to mutableStateOf(isOn) }
-    }
-
-    ElevatedCard(
-        modifier = modifier
-            .heightIn(min = 180.dp)
-            .fillMaxWidth()
-            .shadow(4.dp),
-        shape = RoundedCornerShape(20.dp),
-        onClick = onClick,
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(16.dp)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.Start
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    imageVector = category.icon,
-                    contentDescription = category.name,
-                    modifier = Modifier.size(32.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = category.name,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = "${devices.size}",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // List of devices with icons and (optional) toggle buttons
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                deviceStates.forEach { (deviceName, isOnState) ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = if (isOnState.value) Icons.Default.Power else Icons.Default.PowerSettingsNew,
-                                contentDescription = if (isOnState.value) "On" else "Off",
-                                modifier = Modifier.size(16.dp),
-                                tint = if (isOnState.value) Color(0xFF4CAF50) else Color(0xFFB0BEC5)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = deviceName,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-
-                        if (supportsToggle) {
-                            IconButton(onClick = {
-                                if (category.name == "Lights") {
-                                    onTogglePower?.invoke()
-                                }
-                            }) {
-                                Icon(
-                                    imageVector = if (isLightOn) Icons.Default.ToggleOn else Icons.Default.ToggleOff,
-                                    contentDescription = "Toggle",
-                                    tint = if (isLightOn) Color(0xFF4CAF50) else Color(0xFFB0BEC5),
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-                        }
-
-                    }
-                }
-            }
-        }
-    }
-}
-
- */
 
 @Composable
 private fun DeviceCategoryCard(
@@ -2725,7 +2064,7 @@ private fun BottomButtons(navController: NavHostController) {
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 20.dp, start = 20.dp, end = 20.dp),
+                .padding(bottom = 20.dp, start = 20.dp, end = 20.dp), // ← fixed position
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             OutlinedButton(
@@ -2735,6 +2074,7 @@ private fun BottomButtons(navController: NavHostController) {
             ) {
                 Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
+                //Text("Schedule", style = MaterialTheme.typography.labelLarge)
             }
 
             Button(
@@ -2747,47 +2087,15 @@ private fun BottomButtons(navController: NavHostController) {
                 Text("Add Device", style = MaterialTheme.typography.labelLarge)
             }
 
-            // Smart suggestions button with badge
-            Box(modifier = Modifier.weight(1f)) {
-                // Get context first, then use it
-                val context = LocalContext.current
-                val usageTrackingManager = remember { UsageTrackingManager(context) }
-                var suggestionCount by remember { mutableStateOf(0) }
-
-                // Update count when screen appears
-                LaunchedEffect(Unit) {
-                    suggestionCount = usageTrackingManager.getSavedSuggestions().size
-                }
-
-                OutlinedButton(
-                    onClick = { navController.navigate("suggestions") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Icon(
-                        Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
-                // Show badge if suggestions available
-                if (suggestionCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(top = (-8).dp, end = (-8).dp)
-                    ) {
-                        Badge(
-                            containerColor = MaterialTheme.colorScheme.error
-                        ) {
-                            Text(
-                                text = suggestionCount.toString(),
-                                color = MaterialTheme.colorScheme.onError
-                            )
-                        }
-                    }
-                }
+            OutlinedButton( // AI BUTTON
+                onClick = { navController.navigate("settings") },
+                //onClick = { navController.navigate("aiscreen") },
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.CoPresent, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                //Text("Profile", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
@@ -3033,7 +2341,9 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                         deviceManager.addDevice(deviceName, selectedDeviceType)
                         showConfirmDialog = false
                         onDeviceAdded()
-                        navController.navigate("home")
+                        if (selectedDeviceType != "Plug") {
+                            navController.navigate("home")
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary
@@ -3056,427 +2366,6 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
         )
     }
 }
-
-
-
-
-//working lightscreen 2.0
-/*
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LightsScreen(navController: NavHostController) {
-    val knownLights = DeviceManager.knownLights
-    var selectedLight by remember { mutableStateOf<String?>(null) }
-    var isLightOn by remember { mutableStateOf(false) }
-    var selectedColor by remember { mutableStateOf(Color.White) }
-    var brightness by remember { mutableStateOf(0.8f) }
-    var showScheduleDialog by remember { mutableStateOf(false) }
-    var showConfirmation by remember { mutableStateOf(false) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Lights Control") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Light Selection Card
-            LightSelectionCard(
-                knownLights = knownLights,
-                selectedLight = selectedLight,
-                onLightSelected = { selectedLight = it }
-            )
-
-            if (selectedLight != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                        ExposedDropdownMenu(
-                            expanded = typeExpanded,
-                            onDismissRequest = { typeExpanded = false }
-                        ) {
-                            deviceTypes.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type) },
-                                    onClick = {
-                                        selectedDeviceType = type
-                                        selectedDeviceName = null
-                                        typeExpanded = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = when (type) {
-                                                "Camera" -> Icons.Default.Videocam
-                                                "Light" -> Icons.Default.LightMode
-                                                "Plug" -> Icons.Default.Power
-                                                else -> Icons.Default.Sensors
-                                            },
-                                            contentDescription = null
-                                        )
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Color Selection Card
-                ColorSelectionCard(
-                    selectedColor = selectedColor,
-                    onColorSelected = { selectedColor = it }
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Schedule and Save Buttons
-                ActionButtons(
-                    onScheduleClick = { showScheduleDialog = true },
-                    onSaveClick = { showConfirmation = true }
-                )
-            }
-        }
-    }
-
-    // Schedule Dialog
-    if (showScheduleDialog) {
-        EnhancedScheduleDialog(onDismiss = { showScheduleDialog = false })
-    }
-
-    // Confirmation Dialog
-    if (showConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showConfirmation = false },
-            title = { Text("Success") },
-            text = { Text("Light settings have been saved successfully.") },
-            confirmButton = {
-                Button(onClick = {
-                    showConfirmation = false
-                    navController.navigateUp()
-                }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-}
-
-*/
-
-//working lightscreen2.1
-/*
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LightsScreen(
-    navController: NavHostController,
-    onTurnLightOn: () -> Unit,   // Accept functions
-    onTurnLightOff: () -> Unit   // Accept functions
-) {
-    val knownLights = DeviceManager.knownLights
-    var selectedLight by remember { mutableStateOf<String?>(null) }
-    var isLightOn by remember { mutableStateOf(false) }
-    var selectedColor by remember { mutableStateOf(Color.White) }
-    var brightness by remember { mutableStateOf(0.8f) }
-    var showScheduleDialog by remember { mutableStateOf(false) }
-    var showConfirmation by remember { mutableStateOf(false) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Lights Control") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            LightSelectionCard(
-                knownLights = knownLights,
-                selectedLight = selectedLight,
-                onLightSelected = { selectedLight = it }
-            )
-
-            if (selectedLight != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                LightControlsCard(
-                    isLightOn = isLightOn,
-                    onPowerChange = {
-                        if (isLightOn) {
-                            onTurnLightOff()
-                        } else {
-                            onTurnLightOn()
-                        }
-                        isLightOn = !isLightOn
-                    },
-                    brightness = brightness,
-                    onBrightnessChange = { brightness = it },
-                    selectedColor = selectedColor
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                ColorSelectionCard(
-                    selectedColor = selectedColor,
-                    onColorSelected = { selectedColor = it }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                ActionButtons(
-                    onScheduleClick = { showScheduleDialog = true },
-                    onSaveClick = { showConfirmation = true }
-                )
-            }
-        }
-    }
-
-    if (showScheduleDialog) {
-        EnhancedScheduleDialog(onDismiss = { showScheduleDialog = false })
-    }
-
-    if (showConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showConfirmation = false },
-            title = { Text("Success") },
-            text = { Text("Light settings have been saved successfully.") },
-            confirmButton = {
-                Button(onClick = {
-                    showConfirmation = false
-                    navController.navigateUp()
-                }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-}
-
- */
-
-
-
-/* 2.43 working lightscreen
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LightsScreen(
-    navController: NavHostController,
-    onTurnLightOn: () -> Unit,
-    onTurnLightOff: () -> Unit,
-    onBrightnessChange: (Float) -> Unit,
-    onSetColor: (Color) -> Unit
-) {
-    val knownLights = DeviceManager.knownLights
-    var selectedLight by remember { mutableStateOf<String?>(null) }
-    var isLightOn by remember { mutableStateOf(false) }
-    var selectedColor by remember { mutableStateOf(Color.White) }
-    var brightness by remember { androidx.compose.runtime.mutableFloatStateOf(0.8f) }
-    var showScheduleDialog by remember { mutableStateOf(false) }
-    var showConfirmation by remember { mutableStateOf(false) }
-    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
-
-    // Get context and PersistentDeviceManager
-    val context = LocalContext.current
-    val deviceManager = remember { PersistentDeviceManager(context) }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Lights Control") },
-                navigationIcon = {
-                    IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary
-                )
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .verticalScroll(rememberScrollState())
-        ) {
-            // Device Selection Card
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Select Light",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    if (knownLights.isEmpty()) {
-                        Text(
-                            text = "No lights added yet. Add a light from the home screen.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    } else {
-                        knownLights.forEach { light ->
-                            DeviceListItem(
-                                deviceName = light,
-                                onSelect = { selectedLight = light },
-                                onDelete = { showDeleteConfirmation = light },
-                                isSelected = light == selectedLight
-                            )
-                        }
-                    }
-                }
-            }
-
-            if (selectedLight != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                LightControlsCard(
-                    isLightOn = isLightOn,
-                    onPowerChange = {
-                        if (isLightOn) {
-                            onTurnLightOff()
-                            isLightOn = false
-                        } else {
-                            onTurnLightOn()
-                            isLightOn = true
-                        }
-                    },
-                    brightness = brightness,
-                    onBrightnessChange = {
-                        brightness = it
-                        onBrightnessChange(it)
-                    },
-                    selectedColor = selectedColor
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                ColorSelectionCard(
-                    selectedColor = selectedColor,
-                    onColorSelected = { color ->
-                        selectedColor = color
-                        onSetColor(color)
-                    },
-                    setColor = onSetColor // Pass setColor function properly
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                ActionButtons(
-                    onScheduleClick = { showScheduleDialog = true },
-                    onSaveClick = { showConfirmation = true }
-                )
-            }
-        }
-    }
-
-    // Delete confirmation dialog
-    showDeleteConfirmation?.let { deviceName ->
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmation = null },
-            title = { Text("Delete Device") },
-            text = { Text("Are you sure you want to remove $deviceName?") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        deviceManager.removeDevice(deviceName, "Light")
-                        if (selectedLight == deviceName) {
-                            selectedLight = null
-                        }
-                        showDeleteConfirmation = null
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirmation = null }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-
-    // Show schedule dialog
-    if (showScheduleDialog && selectedLight != null) {
-        EnhancedScheduleDialog(
-            onDismiss = { showScheduleDialog = false },
-            deviceName = selectedLight!!,  // Pass the selected light name
-            deviceType = "Light",          // Set device type as "Light"
-            onSaveSchedule = { scheduleString ->
-                try {
-                    deviceManager.saveSchedule(scheduleString)
-                    // Show confirmation
-                    Toast.makeText(context, "Schedule saved", Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Log.e("LightsScreen", "Error saving schedule: ${e.message}", e)
-                    // Show error
-                    Toast.makeText(context, "Failed to save schedule", Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
-    }
-
-    if (showConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showConfirmation = false },
-            title = { Text("Success") },
-            text = { Text("Light settings have been saved successfully.") },
-            confirmButton = {
-                Button(onClick = {
-                    showConfirmation = false
-                    navController.navigateUp()
-                }) {
-                    Text("OK")
-                }
-            }
-        )
-    }
-}
- */
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -6284,9 +5173,7 @@ fun MyNavHost(
         composable("forgot-password") {
             ForgotPasswordScreen(navController)
         }
-        composable("suggestions") {
-            SuggestionsScreen(navController)
-        }
+
         composable(
             route = "reset-password-verify/{email}",
             arguments = listOf(
