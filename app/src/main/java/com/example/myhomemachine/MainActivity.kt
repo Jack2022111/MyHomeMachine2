@@ -1,26 +1,37 @@
 package com.example.myhomemachine
-import androidx.compose.material.icons.filled.AutoAwesome
-import android.Manifest.permission
-import android.app.Application as AndroidApplication
 // for the Notification in the plug
-import com.example.myhomemachine.DeviceType
-import com.example.myhomemachine.EventType
 
 
+import android.Manifest
+import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.material3.TextField
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,18 +44,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Lock
@@ -57,28 +79,35 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.SensorsOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.ToggleOff
+import androidx.compose.material.icons.filled.ToggleOn
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.WbSunny
-import androidx.compose.ui.unit.sp
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -90,25 +119,28 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.animation.*
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -116,149 +148,44 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.myhomemachine.data.DeviceManager
+import com.example.myhomemachine.data.PersistentDeviceManager
+import com.example.myhomemachine.data.UsageTrackingManager
+import com.example.myhomemachine.network.AuthViewModel
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Call
 import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
-import java.io.IOException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.*
-import android.util.Log
-import androidx.fragment.app.FragmentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.LocalContext
-import androidx.navigation.compose.rememberNavController
-import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
-import android.provider.Settings
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import android.net.wifi.WifiNetworkSpecifier
-import android.net.ConnectivityManager
-import android.net.NetworkRequest
-import android.os.Build
-import androidx.annotation.RequiresApi
-import android.content.Intent
-import android.net.Network
-import android.net.NetworkCapabilities
-import androidx.compose.foundation.border
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
-import androidx.activity.viewModels
-import androidx.lifecycle.ViewModelProvider
-
-import kotlin.math.roundToInt
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.compose.runtime.remember
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.myhomemachine.network.AuthViewModel
-import com.example.myhomemachine.SettingsScreen
-import androidx.navigation.navArgument
-import androidx.navigation.NavType
-import com.example.myhomemachine.ForgotPasswordScreen
-import com.example.myhomemachine.data.PersistentDeviceManager
-import com.example.myhomemachine.SessionManager
-
-
-import androidx.navigation.navArgument
-import androidx.compose.foundation.text.KeyboardOptions
-import com.example.myhomemachine.VerificationType
-import com.example.myhomemachine.CodeVerificationScreen
-import com.example.myhomemachine.ResetPasswordConfirmScreen
-import java.util.UUID
-import android.widget.TextView
-import com.example.myhomemachine.RetrofitClient
-import com.example.myhomemachine.SwitchBotResponse
-import com.example.myhomemachine.DeviceStatus
-import com.example.myhomemachine.SwitchBotApiService
-import retrofit2.*
+import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import kotlin.math.ln
+import java.io.IOException
+import java.util.Locale
+import java.util.UUID
 import kotlin.math.exp
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.graphics.nativeCanvas
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import androidx.core.app.NotificationCompat
-import androidx.compose.ui.platform.LocalContext
-import android.app.PendingIntent
-import androidx.core.app.NotificationManagerCompat
-import android.content.BroadcastReceiver
-
-import android.content.IntentFilter
-import com.example.myhomemachine.service.ScheduleService
-import com.example.myhomemachine.data.Schedule
-import java.time.DayOfWeek
-import java.time.LocalTime
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.RadioButton
-import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.shape.CircleShape
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.material3.RadioButtonDefaults
-import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import com.example.myhomemachine.data.UsageTrackingManager
-import androidx.compose.material3.Badge
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.unit.offset
+import kotlin.math.ln
+import kotlin.math.roundToInt
 
 // lifx stuff super unsecure
 private const val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
@@ -269,13 +196,6 @@ private const val BASE_URL = "https://api.switch-bot.com/"
 private const val sbdeviceId = "F90D2BD4D12F" // Replace with your actual deviceId
 private const val sbtoken = "68bc54e2a5495d4a8f560a38744a2a4178ff857528dd3a84f4eb51b6d75b516070f33a7b823e555f5fdb7d530df79997"
 private const val sbsecret = "28f1ee6611fbf2be9cfab357bc7a3480"
-
-
-fun String.capitalize(): String {
-    return this.lowercase().replaceFirstChar {
-        if (it.isLowerCase()) it.titlecase() else it.toString()
-    }
-}
 
 
 class SharedViewModel(application: Application) : AndroidViewModel(application) {
@@ -300,9 +220,6 @@ class MainActivity : AppCompatActivity() {
     lateinit var retrofitClient: RetrofitClient
 
     private lateinit var usageTrackingManager: UsageTrackingManager
-    private val channelId = "i.apps.notifications" // Unique channel ID for notifications
-    private val description = "Test notification"  // Description for the notification channel
-    private val notificationId = 1234 // Unique identifier for the notification
     private  val CHANNEL_ID = "my_channel_id"
 
     @RequiresApi(Build.VERSION_CODES.M)
@@ -342,7 +259,6 @@ class MainActivity : AppCompatActivity() {
                         sharedViewModel = sharedViewModel,
                         onTurnLightOn = { turnLightOn() },
                         onTurnLightOff = { turnLightOff() },
-                        onBrightnessChange = { brightness -> setBrightness(brightness) },
                         setBrightness = { brightness -> this.setBrightness(brightness) },
                         onSetColor = { color -> setColor(color) },
                         sessionManager = sessionManager,  // Pass SessionManager to NavHost
@@ -430,49 +346,6 @@ class MainActivity : AppCompatActivity() {
         }
         super.onDestroy()
     }
-
-    private fun executeScheduledAction(deviceName: String, deviceType: String, action: String, value: String) {
-        when (deviceType) {
-            "Light" -> {
-                when (action) {
-                    "ON" -> turnLightOn()
-                    "OFF" -> turnLightOff()
-                    "SET_BRIGHTNESS" -> {
-                        val brightness = value.toFloatOrNull() ?: 0.8f
-                        setBrightness(brightness / 100f) // Convert percentage to 0-1 range
-                    }
-                    "SET_COLOR" -> {
-                        try {
-                            // Parse hex color code
-                            val colorInt = android.graphics.Color.parseColor(value)
-                            val color = Color(colorInt)
-                            setColor(color)
-                        } catch (e: Exception) {
-                            Log.e("MainActivity", "Error parsing color for schedule: $e")
-                        }
-                    }
-                }
-                sendNotification("Light Schedule", "Executed $action for $deviceName")
-            }
-            "Plug" -> {
-                val deviceController = DeviceController(this)
-                when (action) {
-                    "ON" -> deviceController.turnOnPlug()
-                    "OFF" -> deviceController.turnOffPlug()
-                }
-                sendNotification("Plug Schedule", "Executed $action for $deviceName")
-            }
-            "Camera" -> {
-                // Add camera actions here
-                sendNotification("Camera Schedule", "Executed $action for $deviceName")
-            }
-            "Sensor" -> {
-                // Add sensor actions here
-                sendNotification("Sensor Schedule", "Executed $action for $deviceName")
-            }
-        }
-    }
-
 
 
     // ✅ Fetch Temperature from SwitchBot API
@@ -710,7 +583,7 @@ class MainActivity : AppCompatActivity() {
 }
 
 // DeviceController class to manage the Shelly Plug
-class DeviceController (private val context: Context) {
+class DeviceController (context: Context) {
 
     private val client = OkHttpClient()
     private val deviceNotifier = DeviceNotificationManager(context)
@@ -1427,7 +1300,7 @@ fun ShellyScreen(
                 title = { Text("Shelly Plug Setup") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -1552,7 +1425,7 @@ fun SignupScreen(navController: NavHostController) {
             ) {
                 IconButton(onClick = { navController.navigateUp() }) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back"
                     )
                 }
@@ -1887,7 +1760,7 @@ fun LoginScreen(navController: NavHostController) {
             ) {
                 IconButton(onClick = { navController.navigateUp() }) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back"
                     )
                 }
@@ -1986,7 +1859,7 @@ fun LoginScreen(navController: NavHostController) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            androidx.compose.material3.Checkbox(
+                            Checkbox(
                                 checked = rememberMe,
                                 onCheckedChange = { newValue -> rememberMe = newValue }
                             )
@@ -2323,7 +2196,6 @@ private data class DeviceCategory(
 @Composable
 fun HomeScreen(
     navController: NavHostController,
-    sessionManager: SessionManager,
     deviceController: DeviceController,
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit
@@ -2813,7 +2685,7 @@ private fun BottomButtons(navController: NavHostController) {
                 // Get context first, then use it
                 val context = LocalContext.current
                 val usageTrackingManager = remember { UsageTrackingManager(context) }
-                var suggestionCount by remember { mutableStateOf(0) }
+                var suggestionCount by remember { mutableIntStateOf(0) }
 
                 // Update count when screen appears
                 LaunchedEffect(Unit) {
@@ -2914,7 +2786,7 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                 title = { Text("Add New Device") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -3554,7 +3426,7 @@ fun LightsScreen(
     var selectedLight by remember { mutableStateOf<String?>(null) }
     var isLightOn by remember { mutableStateOf(false) }
     var selectedColor by remember { mutableStateOf(Color.White) }
-    var brightness by remember { androidx.compose.runtime.mutableFloatStateOf(0.8f) }
+    var brightness by remember { mutableFloatStateOf(0.8f) }
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showConfirmation by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
@@ -3569,7 +3441,7 @@ fun LightsScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -3654,8 +3526,7 @@ fun LightsScreen(
                         onBrightnessChange = {
                             brightness = it
                             onBrightnessChange(it)
-                        },
-                        selectedColor = selectedColor
+                        }
                     )
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -3742,75 +3613,14 @@ fun LightsScreen(
 }
 
 
-
-
-// USED FOR SELECTING WHICH LIGHT YOU WANT TO USE
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun LightSelectionCard(
-    knownLights: List<String>,
-    selectedLight: String?,
-    onLightSelected: (String) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Select Light",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            ExposedDropdownMenuBox(
-                expanded = expanded,
-                onExpandedChange = { expanded = it }
-            ) {
-                OutlinedTextField(
-                    value = selectedLight ?: "Choose a light",
-                    onValueChange = {},
-                    readOnly = true,
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .menuAnchor()
-                )
-
-                ExposedDropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
-                ) {
-                    knownLights.forEach { light ->
-                        DropdownMenuItem(
-                            text = { Text(light) },
-                            onClick = {
-                                onLightSelected(light)
-                                expanded = false
-                            }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-
 @Composable
 private fun LightControlsCard(
     isLightOn: Boolean,
     onPowerChange: (Boolean) -> Unit,
     brightness: Float,
-    onBrightnessChange: (Float) -> Unit,
-    selectedColor: Color
+    onBrightnessChange: (Float) -> Unit
 ) {
-    var rotationState by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var rotationState by remember { mutableFloatStateOf(0f) }
     val rotation by animateFloatAsState(
         targetValue = rotationState,
         animationSpec = tween(durationMillis = 1000, easing = LinearEasing)
@@ -3986,9 +3796,9 @@ private fun CustomColorPickerDialog(
     onColorSelected: (Color) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var red by remember { androidx.compose.runtime.mutableFloatStateOf(initialColor.red) }
-    var green by remember { androidx.compose.runtime.mutableFloatStateOf(initialColor.green) }
-    var blue by remember { androidx.compose.runtime.mutableFloatStateOf(initialColor.blue) }
+    var red by remember { mutableFloatStateOf(initialColor.red) }
+    var green by remember { mutableFloatStateOf(initialColor.green) }
+    var blue by remember { mutableFloatStateOf(initialColor.blue) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -4154,7 +3964,7 @@ fun PlugsScreen(navController: NavHostController, deviceController: DeviceContro
                 title = { Text("Smart Plugs") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -4318,7 +4128,7 @@ fun CamerasScreen(navController: NavHostController) {
                 title = { Text("Cameras") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -4514,7 +4324,7 @@ fun SensorsScreen(navController: NavHostController) {
                 title = { Text("Sensors") },
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -4752,11 +4562,11 @@ fun cToF(celsius: Double): Double {
 // Custom radial gauge for Temperature
 @Composable
 fun TemperatureGauge(
+    modifier: Modifier = Modifier,
     temperature: Double,
     minTemp: Double = 0.0,
     maxTemp: Double = 40.0,
-    degreeLabel: String = "°C",
-    modifier: Modifier = Modifier
+    degreeLabel: String = "°C"
 ) {
     val sweepAngle = (((temperature - minTemp) / (maxTemp - minTemp)) * 270.0).toFloat()
     Canvas(modifier = modifier) {
@@ -5054,42 +4864,6 @@ fun MeterStatusDisplay(
 }
 
 
-
-
-@Composable
-fun AirQualityDisplay(airQualityHistory: List<Int>) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Air Quality History",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-
-            airQualityHistory.forEachIndexed { index, quality ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Time ${index + 1}")
-                    Text("$quality AQI", style = MaterialTheme.typography.titleMedium)
-                }
-                if (index < airQualityHistory.lastIndex) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                }
-            }
-        }
-    }
-}
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SchedulePage(navController: NavHostController) {
@@ -5138,7 +4912,7 @@ fun SchedulePage(navController: NavHostController) {
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -5383,8 +5157,8 @@ fun EnhancedScheduleDialog(
     var selectedDevice by remember { mutableStateOf(deviceName) }
 
     // Time selection
-    var selectedHour by remember { mutableStateOf(8) }
-    var selectedMinute by remember { mutableStateOf(0) }
+    var selectedHour by remember { mutableIntStateOf(8) }
+    var selectedMinute by remember { mutableIntStateOf(0) }
     var selectedAmPm by remember { mutableStateOf("AM") }
 
     // Action selection
@@ -5396,7 +5170,7 @@ fun EnhancedScheduleDialog(
     var showColorPicker by remember { mutableStateOf(false) }
 
     // Brightness for lights
-    var brightness by remember { mutableStateOf(80f) }
+    var brightness by remember { mutableFloatStateOf(80f) }
 
     // Days selection
     var selectedDays by remember { mutableStateOf(setOf("MON", "TUE", "WED", "THU", "FRI")) }
@@ -5413,9 +5187,9 @@ fun EnhancedScheduleDialog(
     var actionExpanded by remember { mutableStateOf(false) }
 
     // Color picker state - use regular mutableStateOf instead of mutableFloatStateOf
-    var red by remember { mutableStateOf(selectedColor.red) }
-    var green by remember { mutableStateOf(selectedColor.green) }
-    var blue by remember { mutableStateOf(selectedColor.blue) }
+    var red by remember { mutableFloatStateOf(selectedColor.red) }
+    var green by remember { mutableFloatStateOf(selectedColor.green) }
+    var blue by remember { mutableFloatStateOf(selectedColor.blue) }
 
     // Load device lists based on type
     LaunchedEffect(selectedDeviceType) {
@@ -5662,7 +5436,7 @@ fun EnhancedScheduleDialog(
                                 modifier = Modifier.weight(1f)
                             ) {
                                 OutlinedTextField(
-                                    value = String.format("%02d", selectedMinute),
+                                    value = String.format(Locale.getDefault(), "%02d", selectedMinute),
                                     onValueChange = {},
                                     readOnly = true,
                                     label = { Text("Minute") },
@@ -5679,7 +5453,7 @@ fun EnhancedScheduleDialog(
                                     // Allow selection of any minute 0-59
                                     (0..59).forEach { minute ->
                                         DropdownMenuItem(
-                                            text = { Text(String.format("%02d", minute)) },
+                                            text = { Text(String.format(Locale.getDefault(), "%02d", minute)) },
                                             onClick = {
                                                 selectedMinute = minute
                                                 minuteExpanded = false
@@ -5725,7 +5499,7 @@ fun EnhancedScheduleDialog(
 
                         // Display selected time
                         Text(
-                            text = "Selected time: ${selectedHour}:${String.format("%02d", selectedMinute)} ${selectedAmPm}",
+                            text = "Selected time: ${selectedHour}:${String.format(Locale.getDefault(), "%02d", selectedMinute)} $selectedAmPm",
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.align(Alignment.CenterHorizontally)
                         )
@@ -6064,7 +5838,7 @@ fun EnhancedScheduleDialog(
                             }
 
                             // Format action string and value
-                            val (actionString, actionValue) = when (selectedAction) {
+                            val (actionString, _) = when (selectedAction) {
                                 "ON" -> Pair("turn ON", "")
                                 "OFF" -> Pair("turn OFF", "")
                                 "SET_COLOR" -> {
@@ -6081,7 +5855,7 @@ fun EnhancedScheduleDialog(
                             }
 
                             // Format time string
-                            val timeString = String.format("%d:%02d %s", selectedHour, selectedMinute, selectedAmPm)
+                            val timeString = String.format(Locale.getDefault(), "%02d:%02d %s", selectedHour, selectedMinute, selectedAmPm)
 
                             // Create schedule string
                             val scheduleString = "$selectedDevice ($selectedDeviceType): $actionString at $timeString on $daysString"
@@ -6292,7 +6066,6 @@ fun MyNavHost(
     sharedViewModel: SharedViewModel,
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit,
-    onBrightnessChange: (Float) -> Unit,
     setBrightness: (Float) -> Unit,
     onSetColor: (Color) -> Unit,
     sessionManager: SessionManager,       // Add SessionManager parameter
@@ -6408,7 +6181,6 @@ fun MyNavHost(
         composable("home") {
             HomeScreen(
                 navController = navController,
-                sessionManager = sessionManager,
                 deviceController = deviceController,
                 onTurnLightOn = onTurnLightOn,
                 onTurnLightOff = onTurnLightOff
@@ -6466,12 +6238,11 @@ fun PreviewLoginScreen() {
 fun PreviewHomeScreen() {
     val navController = rememberNavController() // Mock NavController for preview
     val context = LocalContext.current
-    val mockSessionManager = remember { SessionManager(context) } // Create mock SessionManager for preview
+    remember { SessionManager(context) } // Create mock SessionManager for preview
     val mockDeviceController = remember { DeviceController(context) }
 
     HomeScreen(
         navController = navController,
-        sessionManager = mockSessionManager,
         deviceController = mockDeviceController,
         onTurnLightOn = {}, // 🔧 pass no-op lambda
         onTurnLightOff = {} // 🔧 pass no-op lambda
