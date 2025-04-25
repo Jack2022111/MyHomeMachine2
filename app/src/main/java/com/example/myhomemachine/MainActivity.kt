@@ -1020,6 +1020,7 @@ suspend fun fetchMeterStatus(): MeterStatus? {
 
 @Composable
 fun FirstScreen(navController: NavHostController) {
+    var showTutorial by remember { mutableStateOf(true) }
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -1046,6 +1047,33 @@ fun FirstScreen(navController: NavHostController) {
                         .padding(16.dp),
                     contentScale = ContentScale.Fit
                 )
+            }
+
+            if (showTutorial) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF0069FF)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Box(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Welcome! Tap 'Sign Up' to create an account or 'Login' to continue.",
+                            color = Color.White,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(end = 32.dp)
+                        )
+                        IconButton(
+                            onClick = { showTutorial = false },
+                            modifier = Modifier.align(Alignment.TopEnd)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White)
+                        }
+                    }
+                }
             }
 
             // Middle section with welcome text
@@ -1155,11 +1183,13 @@ fun FirstScreen(navController: NavHostController) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "DEV BYPASS",
+                        text = "DEMO BYPASS",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
 
+
+                /*
                 Button(
                     onClick = { navController.navigate("wififence") }, // to cracked version of geofence
                     modifier = Modifier
@@ -1185,6 +1215,8 @@ fun FirstScreen(navController: NavHostController) {
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
+
+                 */
             }
         }
     }
@@ -2296,6 +2328,9 @@ fun HomeScreen(
     onTurnLightOn: () -> Unit,
     onTurnLightOff: () -> Unit
 ) {
+    var showTutorial by remember { mutableStateOf(true) }
+    var isLightOn by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -2329,7 +2364,6 @@ fun HomeScreen(
                     brush = Brush.linearGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.secondary,
-                            //Color(0xFF2196F3),
                             Color.White,
                             Color.White,
                             MaterialTheme.colorScheme.primary
@@ -2345,8 +2379,36 @@ fun HomeScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 100.dp) // so content doesn't hide behind the buttons
             ) {
+                // 🧠 Tutorial message
+                if (showTutorial) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF0069FF)),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Box(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = "Use the buttons below to add and control your smart devices!",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .padding(end = 32.dp)
+                            )
+                            IconButton(
+                                onClick = { showTutorial = false },
+                                modifier = Modifier.align(Alignment.TopEnd)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White)
+                            }
+                        }
+                    }
+                }
+
                 WelcomeSection()
-                var isLightOn by remember { mutableStateOf(false) }
+
                 DeviceGrid(
                     navController = navController,
                     deviceController = deviceController,
@@ -2362,9 +2424,8 @@ fun HomeScreen(
                 )
             }
 
-            BottomButtons(navController) // now absolutely positioned
+            BottomButtons(navController)
         }
-
     }
 }
 
@@ -3033,7 +3094,9 @@ fun AddDeviceScreen(onDeviceAdded: () -> Unit, navController: NavHostController)
                         deviceManager.addDevice(deviceName, selectedDeviceType)
                         showConfirmDialog = false
                         onDeviceAdded()
-                        navController.navigate("home")
+                        if (selectedDeviceType != "Plug") {
+                            navController.navigate("home")
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondary
@@ -3948,21 +4011,21 @@ private fun CustomColorPickerDialog(
                 Slider(
                     value = red,
                     onValueChange = { red = it },
-                    colors = SliderDefaults.colors(thumbColor = Color.Red)
+                    colors = SliderDefaults.colors(thumbColor = Color.Red, activeTrackColor = Color.Red)
                 )
 
                 Text("Green")
                 Slider(
                     value = green,
                     onValueChange = { green = it },
-                    colors = SliderDefaults.colors(thumbColor = Color.Green)
+                    colors = SliderDefaults.colors(thumbColor = Color.Green, activeTrackColor = Color.Green)
                 )
 
                 Text("Blue")
                 Slider(
                     value = blue,
                     onValueChange = { blue = it },
-                    colors = SliderDefaults.colors(thumbColor = Color.Blue)
+                    colors = SliderDefaults.colors(thumbColor = Color.Blue, activeTrackColor = Color.Blue)
                 )
 
                 // Hex color code display
