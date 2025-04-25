@@ -348,7 +348,7 @@ class MainActivity : AppCompatActivity() {
         val apiService = retrofitClient.instance
         val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
 
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 apiService.setLightState(
                     selector = LIFX_SELECTOR,
@@ -356,15 +356,23 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 isLightOn = true
-                Log.d("LIFX", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
-                sendNotification("Light Devices", "Light turned ON with color: $lastColor at brightness: $currentBrightness")
+                withContext(Dispatchers.Main) {
+                    Log.d(
+                        "LIFX",
+                        "Light turned ON with color: $lastColor at brightness: $currentBrightness"
+                    )
+                    sendNotification(
+                        "Light Devices",
+                        "Light turned ON with color: $lastColor at brightness: $currentBrightness"
+                    )
 
-                // Track usage
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "ON"
-                )
+                    // Track usage
+                    usageTrackingManager.trackDeviceUsage(
+                        deviceName = "LIFX Smart Light",
+                        deviceType = "Light",
+                        action = "ON"
+                    )
+                }
 
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light on", e)
@@ -376,7 +384,7 @@ class MainActivity : AppCompatActivity() {
         val apiService = retrofitClient.instance
         val body = LightState(power = "off", color = lastColor)
 
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 apiService.setLightState(
                     selector = LIFX_SELECTOR,
@@ -384,15 +392,17 @@ class MainActivity : AppCompatActivity() {
                     body = body
                 )
                 isLightOn = false
-                Log.d("LIFX", "Light turned OFF")
-                sendNotification("Light Devices", "Light turned OFF")
+                withContext(Dispatchers.Main) {
+                    Log.d("LIFX", "Light turned OFF")
+                    sendNotification("Light Devices", "Light turned OFF")
 
-                // Track usage
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "OFF"
-                )
+                    // Track usage
+                    usageTrackingManager.trackDeviceUsage(
+                        deviceName = "LIFX Smart Light",
+                        deviceType = "Light",
+                        action = "OFF"
+                    )
+                }
 
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to turn light off", e)
@@ -410,23 +420,25 @@ class MainActivity : AppCompatActivity() {
             color = lastColor
         )
 
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 apiService.setLightState(
                     selector = LIFX_SELECTOR,
                     authHeader = "Bearer $LIFX_API_TOKEN",
                     body = body
                 )
-                Log.d("LIFX", "Brightness set to $brightness")
 
-                // Track usage with brightness value
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "SET_BRIGHTNESS",
-                    value = (brightness * 100).toInt().toString()
-                )
+                withContext(Dispatchers.Main) {
+                    Log.d("LIFX", "Brightness set to $brightness")
 
+                    // Track usage with brightness value
+                    usageTrackingManager.trackDeviceUsage(
+                        deviceName = "LIFX Smart Light",
+                        deviceType = "Light",
+                        action = "SET_BRIGHTNESS",
+                        value = (brightness * 100).toInt().toString()
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to set brightness", e)
             }
@@ -452,23 +464,24 @@ class MainActivity : AppCompatActivity() {
         val apiService = retrofitClient.instance
         val body = LightState(color = lastColor, power = "on")
 
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
                 apiService.setLightState(
                     selector = LIFX_SELECTOR,
                     authHeader = "Bearer $LIFX_API_TOKEN",
                     body = body
                 )
-                Log.d("LIFX", "Color set to HSB: ${hsb[0]}, ${hsb[1]}, ${hsb[2]}")
+                withContext(Dispatchers.Main) {
+                    Log.d("LIFX", "Color set to HSB: ${hsb[0]}, ${hsb[1]}, ${hsb[2]}")
 
-                // Track usage with color value
-                usageTrackingManager.trackDeviceUsage(
-                    deviceName = "LIFX Smart Light",
-                    deviceType = "Light",
-                    action = "SET_COLOR",
-                    value = "#" + Integer.toHexString(color.toArgb()).substring(2)
-                )
-
+                    // Track usage with color value
+                    usageTrackingManager.trackDeviceUsage(
+                        deviceName = "LIFX Smart Light",
+                        deviceType = "Light",
+                        action = "SET_COLOR",
+                        value = "#" + Integer.toHexString(color.toArgb()).substring(2)
+                    )
+                }
             } catch (e: Exception) {
                 Log.e("LIFX", "Failed to set color", e)
             }

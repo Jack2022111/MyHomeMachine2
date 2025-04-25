@@ -12,8 +12,10 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.*
 import java.util.concurrent.TimeUnit
+
+// Wrapper for serializing the list of events into a JSON object
+data class EventsWrapper(val events: List<DeviceUsageEvent>)
 
 class UsageTrackingManager(private val context: Context) {
     private val sharedPreferences = context.getSharedPreferences("usage_data", Context.MODE_PRIVATE)
@@ -52,9 +54,9 @@ class UsageTrackingManager(private val context: Context) {
         val pendingEvents = getPendingEvents().toMutableList()
         pendingEvents.add(event)
 
-        val editor = sharedPreferences.edit()
-        editor.putString(KEY_PENDING_EVENTS, gson.toJson(pendingEvents))
-        editor.apply()
+        sharedPreferences.edit()
+            .putString(KEY_PENDING_EVENTS, gson.toJson(pendingEvents))
+            .apply()
 
         Log.d(TAG, "Added usage event: $event")
     }
@@ -68,9 +70,9 @@ class UsageTrackingManager(private val context: Context) {
 
     // Clear pending events
     private fun clearPendingEvents() {
-        val editor = sharedPreferences.edit()
-        editor.putString(KEY_PENDING_EVENTS, "[]")
-        editor.apply()
+        sharedPreferences.edit()
+            .putString(KEY_PENDING_EVENTS, "[]")
+            .apply()
     }
 
     // Send pending events to server
@@ -80,11 +82,13 @@ class UsageTrackingManager(private val context: Context) {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val json = JSONObject().apply {
-                    put("events", JSONObject(gson.toJson(events)))
-                }
+                // Wrap the list in a JSON object and serialize
+                val wrapper = EventsWrapper(events)
+                val jsonString = gson.toJson(wrapper)
 
-                val requestBody = json.toString().toRequestBody("application/json".toMediaType())
+                val requestBody = jsonString
+                    .toRequestBody("application/json".toMediaType())
+
                 val request = Request.Builder()
                     .url("$BASE_URL/usage/track")
                     .post(requestBody)
@@ -115,7 +119,6 @@ class UsageTrackingManager(private val context: Context) {
                 client.newCall(request).execute().use { response ->
                     if (response.isSuccessful) {
                         val jsonResponse = JSONObject(response.body?.string() ?: "{}")
-                        // Fixed the if expression by adding an else branch
                         val suggestions = if (jsonResponse.optBoolean("success", false)) {
                             val suggestionsJson = jsonResponse.optJSONArray("suggestions")?.toString() ?: "[]"
                             val type = object : TypeToken<List<AutomationSuggestion>>() {}.type
@@ -124,16 +127,12 @@ class UsageTrackingManager(private val context: Context) {
                             emptyList()
                         }
 
-                        // Save suggestions locally
                         saveSuggestions(suggestions)
-
-                        // Return suggestions via callback
                         CoroutineScope(Dispatchers.Main).launch {
                             callback(suggestions)
                         }
                     } else {
                         Log.e(TAG, "Failed to fetch suggestions: ${response.code}")
-                        // Return empty list on failure
                         CoroutineScope(Dispatchers.Main).launch {
                             callback(emptyList())
                         }
@@ -141,7 +140,6 @@ class UsageTrackingManager(private val context: Context) {
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching suggestions: ${e.message}")
-                // Return empty list on error
                 CoroutineScope(Dispatchers.Main).launch {
                     callback(emptyList())
                 }
@@ -151,9 +149,9 @@ class UsageTrackingManager(private val context: Context) {
 
     // Save suggestions to local storage
     private fun saveSuggestions(suggestions: List<AutomationSuggestion>) {
-        val editor = sharedPreferences.edit()
-        editor.putString(KEY_SUGGESTIONS, gson.toJson(suggestions))
-        editor.apply()
+        sharedPreferences.edit()
+            .putString(KEY_SUGGESTIONS, gson.toJson(suggestions))
+            .apply()
     }
 
     // Get locally saved suggestions
@@ -180,12 +178,9 @@ class UsageTrackingManager(private val context: Context) {
 
                 client.newCall(request).execute().use { response ->
                     val success = response.isSuccessful
-
                     if (success) {
-                        // Create a schedule based on the suggestion
                         createScheduleFromSuggestion(suggestion)
                     }
-
                     CoroutineScope(Dispatchers.Main).launch {
                         callback(success)
                     }
@@ -214,9 +209,9 @@ class UsageTrackingManager(private val context: Context) {
                     .post(requestBody)
                     .build()
 
-                client.newCall(request).execute().use { response ->
+                client.newCall(request).execute().use {
                     CoroutineScope(Dispatchers.Main).launch {
-                        callback(response.isSuccessful)
+                        callback(it.isSuccessful)
                     }
                 }
             } catch (e: Exception) {
@@ -232,14 +227,12 @@ class UsageTrackingManager(private val context: Context) {
     private fun createScheduleFromSuggestion(suggestion: AutomationSuggestion) {
         val deviceManager = PersistentDeviceManager(context)
 
-        // Format the days string
         val daysString = if (suggestion.daysOfWeek.size == 7) {
             "Every day"
         } else {
             suggestion.daysOfWeek.joinToString(", ")
         }
 
-        // Format the action string
         val actionString = when (suggestion.action) {
             "ON" -> "turn ON"
             "OFF" -> "turn OFF"
@@ -248,12 +241,9 @@ class UsageTrackingManager(private val context: Context) {
             else -> suggestion.action
         }
 
-
-        // Create the schedule string
         val scheduleString = "${suggestion.deviceName} (${suggestion.deviceType}): " +
                 "$actionString at ${suggestion.timeOfDay} on $daysString"
 
-        // Save the schedule
         deviceManager.saveSchedule(scheduleString)
         Log.d(TAG, "Created schedule: $scheduleString")
     }
