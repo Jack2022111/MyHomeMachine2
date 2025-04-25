@@ -1,10 +1,6 @@
 package com.example.myhomemachine.service
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
+import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -14,9 +10,9 @@ import androidx.core.app.NotificationCompat
 import com.example.myhomemachine.MainActivity
 import com.example.myhomemachine.R
 import com.example.myhomemachine.data.DeviceManager
-import java.util.Calendar
-import java.util.Timer
-import java.util.TimerTask
+import java.util.*
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class ScheduleService : Service() {
     private val TAG = "ScheduleService"
@@ -41,7 +37,7 @@ class ScheduleService : Service() {
         Log.d(TAG, "Schedule service started")
 
         // Set a timer to check schedules every minute
-        timer.schedule(object : TimerTask() {
+        timer.scheduleAtFixedRate(object : TimerTask() {
             override fun run() {
                 checkAndExecuteSchedules()
             }
