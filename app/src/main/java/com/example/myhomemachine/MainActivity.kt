@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.wifi.WifiManager
@@ -164,6 +165,7 @@ import com.example.myhomemachine.data.DeviceManager
 import com.example.myhomemachine.data.PersistentDeviceManager
 import com.example.myhomemachine.data.UsageTrackingManager
 import com.example.myhomemachine.network.AuthViewModel
+import com.example.myhomemachine.service.ScheduleService
 import com.example.myhomemachine.ui.theme.MyHomeMachineTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -180,6 +182,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
 import java.util.Locale
 import java.util.UUID
+import kotlin.jvm.java
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.roundToInt
@@ -219,7 +222,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var usageTrackingManager: UsageTrackingManager
     private  val CHANNEL_ID = "my_channel_id"
 
-    @RequiresApi(Build.VERSION_CODES.M)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deviceController = DeviceController(this)
@@ -233,6 +235,23 @@ class MainActivity : AppCompatActivity() {
         // Initialize SessionManager and PersistentDeviceManager
         val sessionManager = SessionManager(this)
         val deviceManager = PersistentDeviceManager(this)
+        val svcIntent = Intent(this, ScheduleService::class.java)
+
+        ContextCompat.startForegroundService(this, svcIntent)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(
+                scheduleReceiver,
+                IntentFilter("com.example.myhomemachine.EXECUTE_SCHEDULE"),
+                RECEIVER_NOT_EXPORTED
+            )
+        } else {
+            // pre-API 33 fallback
+            registerReceiver(
+                scheduleReceiver,
+                IntentFilter("com.example.myhomemachine.EXECUTE_SCHEDULE")
+            )
+        }
 
         // Load devices from persistent storage if user is logged in
         if (sessionManager.isLoggedIn()) {
@@ -269,19 +288,17 @@ class MainActivity : AppCompatActivity() {
 
     private fun createNotificationChannel() {
         // Notification channels are required on Android 8.0+ (API level 26+)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "My Notification Channel"
-            val descriptionText = "This channel is used for demo notifications"
-            val importance = NotificationManager.IMPORTANCE_DEFAULT
+        val name = "My Notification Channel"
+        val descriptionText = "This channel is used for demo notifications"
+        val importance = NotificationManager.IMPORTANCE_DEFAULT
 
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-            }
-
-            // Register the channel with the system
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+            description = descriptionText
         }
+
+        // Register the channel with the system
+        val notificationManager = getSystemService(NotificationManager::class.java)
+        notificationManager.createNotificationChannel(channel)
     }
 
     private fun sendNotification(Title: String, Text: String) {
@@ -894,7 +911,6 @@ fun FirstScreen(navController: NavHostController) {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.M)
 @Composable
 fun WifiMonitorScreen(navController: NavHostController) {
     val context = LocalContext.current
@@ -908,10 +924,8 @@ fun WifiMonitorScreen(navController: NavHostController) {
         val notificationManager = context.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         // Create notification channel for Android O and above.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "WiFi Notifications", NotificationManager.IMPORTANCE_DEFAULT)
-            notificationManager.createNotificationChannel(channel)
-        }
+        val channel = NotificationChannel(channelId, "WiFi Notifications", NotificationManager.IMPORTANCE_DEFAULT)
+        notificationManager.createNotificationChannel(channel)
 
         val notificationBuilder = NotificationCompat.Builder(context.applicationContext, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info) // Replace with actual icon
@@ -992,7 +1006,6 @@ fun WifiMonitorScreen(navController: NavHostController) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@RequiresApi(Build.VERSION_CODES.M)
 @Composable
 fun ShellyScreen(
     navController: NavHostController,
