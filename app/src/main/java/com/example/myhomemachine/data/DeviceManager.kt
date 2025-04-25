@@ -25,8 +25,6 @@ object DeviceManager {
     val knownLights: List<String> get() = knownDevices["Light"] ?: emptyList()
     val knownPlugs: List<String> get() = knownDevices["Plug"] ?: emptyList()
     val knownSensors: List<String> get() = knownDevices["Sensor"] ?: emptyList()
-    val knownOther1: List<String> get() = knownDevices["other1"] ?: emptyList()
-    val knownOther2: List<String> get() = knownDevices["other2"] ?: emptyList()
 
     // Function to add a device with a specific type
     fun addDevice(deviceName: String, type: String) {
@@ -46,13 +44,6 @@ object DeviceManager {
 
         // Remove the device from the list
         deviceList.remove(deviceName)
-    }
-
-    // NEW FUNCTION: Update all devices of a specific type
-    fun updateDevicesOfType(type: String, devices: List<String>) {
-        val deviceList = knownDevices[type] ?: return
-        deviceList.clear()
-        deviceList.addAll(devices)
     }
 
     // NEW FUNCTION: Update all schedules

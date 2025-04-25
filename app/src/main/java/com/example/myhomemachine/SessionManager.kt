@@ -3,6 +3,7 @@ package com.example.myhomemachine
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import androidx.core.content.edit
 
 /**
  * SessionManager handles user session data and persistent login functionality
@@ -24,12 +25,12 @@ class SessionManager(context: Context) {
      * Create user login session
      */
     fun createLoginSession(userId: String, email: String, rememberMe: Boolean) {
-        val editor = sharedPreferences.edit()
-        editor.putBoolean(KEY_IS_LOGGED_IN, true)
-        editor.putString(KEY_USER_ID, userId)
-        editor.putString(KEY_USER_EMAIL, email)
-        editor.putBoolean(KEY_REMEMBER_ME, rememberMe)
-        editor.apply()
+        sharedPreferences.edit {
+            putBoolean(KEY_IS_LOGGED_IN, true)
+            putString(KEY_USER_ID, userId)
+            putString(KEY_USER_EMAIL, email)
+            putBoolean(KEY_REMEMBER_ME, rememberMe)
+        }
     }
 
     /**
@@ -61,17 +62,17 @@ class SessionManager(context: Context) {
      */
     fun logoutUser() {
         val rememberMe = sharedPreferences.getBoolean(KEY_REMEMBER_ME, false)
-        val editor = sharedPreferences.edit()
+        sharedPreferences.edit {
 
-        // If "Remember Me" is enabled, only clear login status but keep credentials
-        if (rememberMe) {
-            editor.putBoolean(KEY_IS_LOGGED_IN, false)
-        } else {
-            // Clear all data except "Remember Me" preference
-            editor.clear()
+            // If "Remember Me" is enabled, only clear login status but keep credentials
+            if (rememberMe) {
+                putBoolean(KEY_IS_LOGGED_IN, false)
+            } else {
+                // Clear all data except "Remember Me" preference
+                clear()
+            }
+
         }
-
-        editor.apply()
     }
 
     /**

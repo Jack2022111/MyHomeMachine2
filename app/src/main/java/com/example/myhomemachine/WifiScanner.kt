@@ -2,24 +2,23 @@ package com.example.myhomemachine
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
-import android.net.wifi.ScanResult
-import android.net.wifi.WifiManager
-import android.provider.Settings
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
-import android.net.wifi.WifiNetworkSpecifier
 import android.net.ConnectivityManager
-import android.net.NetworkRequest
-import android.os.Build
-import androidx.annotation.RequiresApi
-import android.content.Intent
-import android.util.Log
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.Uri
+import android.net.NetworkRequest
+import android.net.wifi.ScanResult
+import android.net.wifi.WifiManager
+import android.net.wifi.WifiNetworkSpecifier
+import android.os.Build
+import android.provider.Settings
+import androidx.annotation.RequiresApi
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
+import androidx.fragment.app.FragmentActivity
 
 //class WifiScanner(private val activity: FragmentActivity) {
 
@@ -41,7 +40,6 @@ class WifiScanner(
         Manifest.permission.CHANGE_NETWORK_STATE
     )
 
-    @RequiresApi(Build.VERSION_CODES.M)
     fun checkPermissionsAndScan() {
         logCallback("Checking permissions and starting scan...")
         val missingPermissions = REQUIRED_PERMISSIONS.filter {
@@ -61,11 +59,10 @@ class WifiScanner(
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.M)
     private fun checkAndRequestWriteSettingsPermission() {
         if (!Settings.System.canWrite(activity)) {
             val intent = Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
-                data = Uri.parse("package:${activity.packageName}")
+                data = "package:${activity.packageName}".toUri()
             }
             activity.startActivity(intent)
             logCallback("Requested WRITE_SETTINGS permission. Please grant it in the settings screen.")

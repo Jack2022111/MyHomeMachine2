@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.myhomemachine"
-        minSdk = 21
+        minSdk = 26
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -57,45 +57,45 @@ dependencies {
 
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
-    implementation ("androidx.compose.ui:ui:<latest_version>")
-    implementation ("androidx.compose.material3:material3:<latest_version>")
-    implementation ("androidx.activity:activity-compose:1.8.0")
-    implementation ("androidx.compose.material3:material3")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.1")
-    implementation ("androidx.compose.material3:material3:1.2.0")
-    implementation("androidx.compose.material3:material3-window-size-class:1.2.0")
+    implementation (libs.ui)
+    implementation (libs.material3)
+    implementation (libs.androidx.activity.compose)
+    implementation (libs.material3)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation (libs.material3)
+    implementation(libs.androidx.material3.window.size.class1)
 
-    implementation("com.squareup.okhttp3:okhttp:4.9.3")
-    implementation("androidx.appcompat:appcompat:1.4.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.3")
-    implementation("androidx.appcompat:appcompat:1.7.0-alpha03")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.compose.material3:material3:1.2.0")
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.activity:activity-compose:1.10.0")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.compose.material3:material3:1.2.0")
-    implementation("androidx.compose.material3:material3-window-size-class:1.2.0")
-    implementation("androidx.compose.material:material:1.5.4")
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
+    implementation(libs.okhttp)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.material3)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.material)
+    implementation(libs.material3)
+    implementation(libs.androidx.material3.window.size.class1)
+    implementation(libs.androidx.material)
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.logging.interceptor)
     // For animations
-    implementation("com.google.accompanist:accompanist-navigation-animation:0.30.1")
+    implementation(libs.accompanist.navigation.animation)
 
     // For extended icons
-    implementation("androidx.compose.material:material-icons-extended:1.5.4")
+    implementation(libs.androidx.material.icons.extended)
     // For custom fonts
-    implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
+    implementation(libs.androidx.ui.text.google.fonts)
     // For coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation(libs.kotlinx.coroutines.android)
 
     // Add Jetpack Compose Navigation
-    implementation("androidx.navigation:navigation-compose:2.7.2")
+    implementation(libs.androidx.navigation.compose)
 
-    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.1")
-    implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
+    implementation (libs.androidx.lifecycle.viewmodel.ktx)
+    implementation (libs.androidx.lifecycle.runtime.ktx)
 
     // Test dependencies
     testImplementation(libs.junit)
@@ -104,16 +104,16 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
 // Unit Testing
-    testImplementation("junit:junit:4.13.2")
-    testImplementation("org.mockito:mockito-core:4.11.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation(libs.junit)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.kotlinx.coroutines.test)
 
 // Android Instrumentation Tests
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 
-    testImplementation("org.mockito:mockito-core:4.11.0")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:4.1.0")
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.mockito.kotlin)
 
     // Debugging
     debugImplementation(libs.androidx.ui.tooling)

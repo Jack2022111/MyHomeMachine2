@@ -13,6 +13,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
+import androidx.core.content.edit
 
 // Wrapper for serializing the list of events into a JSON object
 data class EventsWrapper(val events: List<DeviceUsageEvent>)
@@ -54,9 +55,9 @@ class UsageTrackingManager(private val context: Context) {
         val pendingEvents = getPendingEvents().toMutableList()
         pendingEvents.add(event)
 
-        sharedPreferences.edit()
-            .putString(KEY_PENDING_EVENTS, gson.toJson(pendingEvents))
-            .apply()
+        sharedPreferences.edit {
+            putString(KEY_PENDING_EVENTS, gson.toJson(pendingEvents))
+        }
 
         Log.d(TAG, "Added usage event: $event")
     }
@@ -70,9 +71,9 @@ class UsageTrackingManager(private val context: Context) {
 
     // Clear pending events
     private fun clearPendingEvents() {
-        sharedPreferences.edit()
-            .putString(KEY_PENDING_EVENTS, "[]")
-            .apply()
+        sharedPreferences.edit {
+            putString(KEY_PENDING_EVENTS, "[]")
+        }
     }
 
     // Send pending events to server
@@ -149,9 +150,9 @@ class UsageTrackingManager(private val context: Context) {
 
     // Save suggestions to local storage
     private fun saveSuggestions(suggestions: List<AutomationSuggestion>) {
-        sharedPreferences.edit()
-            .putString(KEY_SUGGESTIONS, gson.toJson(suggestions))
-            .apply()
+        sharedPreferences.edit {
+            putString(KEY_SUGGESTIONS, gson.toJson(suggestions))
+        }
     }
 
     // Get locally saved suggestions

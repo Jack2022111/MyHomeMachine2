@@ -1,7 +1,5 @@
 package com.example.myhomemachine
 
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.Header
 import retrofit2.http.PUT
@@ -23,14 +21,3 @@ interface LifxApiService {
     )
 }
 
-object Retrofit_Client {
-    private const val BASE_URL = "https://api.lifx.com/"
-
-    val instance: LifxApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(LifxApiService::class.java)
-    }
-}

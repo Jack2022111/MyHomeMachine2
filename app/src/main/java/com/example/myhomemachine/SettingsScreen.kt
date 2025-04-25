@@ -10,7 +10,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.example.myhomemachine.network.AuthViewModel
@@ -18,10 +17,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.vector.ImageVector
-import android.content.Context
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.platform.LocalContext
 import android.util.Log
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import com.example.myhomemachine.data.PersistentDeviceManager
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,7 +39,6 @@ fun SettingsScreen(
     var isLoading by remember { mutableStateOf(false) }
 
     // Get user info from SessionManager
-    val context = LocalContext.current
     val userDetails = sessionManager.getUserDetails()
     val userEmail = userDetails[SessionManager.KEY_USER_EMAIL] ?: ""
     var isRememberMeEnabled by remember { mutableStateOf(sessionManager.isRememberMeEnabled()) }
@@ -52,7 +50,7 @@ fun SettingsScreen(
                 navigationIcon = {
                     IconButton(onClick = { navController.navigateUp() }) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -285,7 +283,7 @@ fun SettingsScreen(
                         )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Logout,
+                            imageVector = Icons.AutoMirrored.Filled.Logout,
                             contentDescription = "Logout",
                             tint = MaterialTheme.colorScheme.error
                         )
@@ -435,7 +433,7 @@ fun SettingsScreen(
                                     // Just navigate to verification screen - don't log out or clear data yet
                                     navController.navigate("delete-account/${userEmail}")
                                 } else if (state is AuthViewModel.AuthState.Error) {
-                                    Log.e("SettingsScreen", "Error requesting deletion: ${(state as AuthViewModel.AuthState.Error).message}")
+                                    Log.e("SettingsScreen", "Error requesting deletion: ${state.message}")
                                 }
                             }
                         }
@@ -517,8 +515,7 @@ fun SettingsToggle(
     icon: ImageVector,
     text: String,
     initialState: Boolean,
-    onToggle: (Boolean) -> Unit,
-    iconTint: Color = MaterialTheme.colorScheme.primary
+    onToggle: (Boolean) -> Unit
 ) {
     var isChecked by remember { mutableStateOf(initialState) }
 

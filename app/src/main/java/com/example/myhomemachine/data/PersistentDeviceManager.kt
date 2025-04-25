@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import android.util.Log
+import androidx.core.content.edit
 
 /**
  * PersistentDeviceManager handles storing and retrieving device information
@@ -39,9 +40,9 @@ class PersistentDeviceManager(val context: Context) {
      * Set the current user in SharedPreferences
      */
     private fun setCurrentUser(userEmail: String) {
-        val editor = sharedPreferences.edit()
-        editor.putString(KEY_CURRENT_USER, userEmail)
-        editor.apply()
+        sharedPreferences.edit {
+            putString(KEY_CURRENT_USER, userEmail)
+        }
     }
 
     /**
@@ -64,13 +65,13 @@ class PersistentDeviceManager(val context: Context) {
     ) {
         setCurrentUser(userEmail)
 
-        val editor = sharedPreferences.edit()
-        editor.putString(getUserKey(userEmail, KEY_LIGHTS_SUFFIX), gson.toJson(lights))
-        editor.putString(getUserKey(userEmail, KEY_PLUGS_SUFFIX), gson.toJson(plugs))
-        editor.putString(getUserKey(userEmail, KEY_CAMERAS_SUFFIX), gson.toJson(cameras))
-        editor.putString(getUserKey(userEmail, KEY_SENSORS_SUFFIX), gson.toJson(sensors))
-        editor.putString(getUserKey(userEmail, KEY_SCHEDULES_SUFFIX), gson.toJson(schedules))
-        editor.apply()
+        sharedPreferences.edit {
+            putString(getUserKey(userEmail, KEY_LIGHTS_SUFFIX), gson.toJson(lights))
+            putString(getUserKey(userEmail, KEY_PLUGS_SUFFIX), gson.toJson(plugs))
+            putString(getUserKey(userEmail, KEY_CAMERAS_SUFFIX), gson.toJson(cameras))
+            putString(getUserKey(userEmail, KEY_SENSORS_SUFFIX), gson.toJson(sensors))
+            putString(getUserKey(userEmail, KEY_SCHEDULES_SUFFIX), gson.toJson(schedules))
+        }
     }
 
     /**

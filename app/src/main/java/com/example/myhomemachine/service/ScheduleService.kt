@@ -1,18 +1,21 @@
 package com.example.myhomemachine.service
 
-import android.app.*
-import android.content.Context
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
 import android.content.Intent
-import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.myhomemachine.MainActivity
 import com.example.myhomemachine.R
 import com.example.myhomemachine.data.DeviceManager
-import java.util.*
-import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Locale
+import java.util.Timer
+import java.util.TimerTask
 
 class ScheduleService : Service() {
     private val TAG = "ScheduleService"
@@ -37,7 +40,7 @@ class ScheduleService : Service() {
         Log.d(TAG, "Schedule service started")
 
         // Set a timer to check schedules every minute
-        timer.scheduleAtFixedRate(object : TimerTask() {
+        timer.schedule(object : TimerTask() {
             override fun run() {
                 checkAndExecuteSchedules()
             }
@@ -63,7 +66,7 @@ class ScheduleService : Service() {
                 else -> ""
             }
 
-            val currentTimeStr = String.format("%d:%02d %s", hour, minute, amPm)
+            val currentTimeStr = String.format(Locale.getDefault(), "%d:%02d %s", hour, minute, amPm)
             Log.d(TAG, "Checking schedules at $currentTimeStr on $dayOfWeek")
 
             // Check each schedule
@@ -120,7 +123,7 @@ class ScheduleService : Service() {
                 "Schedule Executed",
                 "Executed: $schedule"
             )
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.notify(schedule.hashCode(), notification)
 
         } catch (e: Exception) {
@@ -129,18 +132,16 @@ class ScheduleService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Schedule Service Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Channel for scheduler service notifications"
-            }
-
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            "Schedule Service Channel",
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Channel for scheduler service notifications"
         }
+
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
     }
 
     private fun createNotification(title: String, content: String): Notification {

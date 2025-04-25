@@ -2,6 +2,7 @@ package com.example.myhomemachine.data
 
 import java.time.DayOfWeek
 import java.time.LocalTime
+import java.util.Locale
 import java.util.UUID
 
 data class Schedule(
@@ -37,6 +38,6 @@ data class Schedule(
         val minute = time.minute
         val amPm = if (hour < 12) "AM" else "PM"
         val hour12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
-        return String.format("%d:%02d %s", hour12, minute, amPm)
+        return String.format(Locale.getDefault(), "%d:%02d %s", hour12, minute, amPm)
     }
 }

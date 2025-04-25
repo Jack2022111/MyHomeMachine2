@@ -1,7 +1,5 @@
 package com.example.myhomemachine.data
 
-import java.util.Date
-
 data class DeviceUsageEvent(
     val deviceId: String,
     val deviceName: String,

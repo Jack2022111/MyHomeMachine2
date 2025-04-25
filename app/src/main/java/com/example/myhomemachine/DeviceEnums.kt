@@ -2,7 +2,7 @@
 package com.example.myhomemachine
 
 enum class DeviceType {
-    LIGHT, PLUG, CAMERA, SENSOR
+    PLUG, CAMERA, SENSOR
 }
 
 enum class EventType {
