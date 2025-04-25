@@ -318,7 +318,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
     private val scheduleReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == "com.example.myhomemachine.EXECUTE_SCHEDULE") {
@@ -361,7 +360,7 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
-    private fun turnLightOn() {
+    fun turnLightOn() {
         val apiService = retrofitClient.instance
         val body = LightState(power = "on", brightness = currentBrightness, color = lastColor)
 
@@ -397,7 +396,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun turnLightOff() {
+    fun turnLightOff() {
         val apiService = retrofitClient.instance
         val body = LightState(power = "off", color = lastColor)
 
@@ -535,11 +534,13 @@ class MainActivity : AppCompatActivity() {
 
 // DeviceController class to manage the Shelly Plug
 class DeviceController (context: Context) {
+    open val client = OkHttpClient()
+    open val deviceNotifier = DeviceNotificationManager(context)
 
-    private val client = OkHttpClient()
-    private val deviceNotifier = DeviceNotificationManager(context)
-    private val usageTrackingManager = UsageTrackingManager(context)
-    //private val shellyIpAddress = "http://10.5.2.30" // Shelly plug IP (this is specifically for b2 wifi network it will change later)
+    // lifx stuff super unsecure
+    private val LIFX_API_TOKEN = "c30381e0c360262972348a08fdda96e118d69ded53ec34bd1e06c24bd37fc247"
+    private val LIFX_SELECTOR = "all" // Can be "label:your_light_name" or "all"
+
 
     // Function to turn on the Shelly Plug
     fun turnOnPlug() {
@@ -550,18 +551,10 @@ class DeviceController (context: Context) {
             deviceName = "Shelly Plug",
             additionalDetails = "Plug turned ON"
         )
-
-        // Track usage
-        usageTrackingManager.trackDeviceUsage(
-            deviceName = "Shelly Plug",
-            deviceType = "Plug",
-            action = "ON"
-        )
     }
 
-
     // Turn off the Shelly Plug
-    fun turnOffPlug() {
+    open fun turnOffPlug() {
         toggleShellyRelay(false)
         deviceNotifier.sendDeviceNotification(
             deviceType = DeviceType.PLUG,
@@ -569,17 +562,39 @@ class DeviceController (context: Context) {
             deviceName = "Shelly Plug",
             additionalDetails = "Plug turned OFF"
         )
-
-        // Track usage
-        usageTrackingManager.trackDeviceUsage(
-            deviceName = "Shelly Plug",
-            deviceType = "Plug",
-            action = "OFF"
-        )
     }
 
+    suspend fun turnOnLight() {
+        try {
+            val api = RetrofitClient().instance
+            val body = LightState(power = "on") // you can add brightness/color if you like
+            api.setLightState("all", "Bearer $LIFX_API_TOKEN", body)
+            deviceNotifier.sendDeviceNotification(
+                deviceType = DeviceType.LIGHT,
+                eventType  = EventType.STATUS_CHANGE,
+                deviceName = "LIFX Smart Light",
+                additionalDetails = "Light turned ON"
+            )
+        } catch (e: Exception) {
+            Log.e("DeviceController","Failed to turn on light", e)
+        }
+    }
 
-
+    suspend fun turnOffLight() {
+        try {
+            val api = RetrofitClient().instance
+            val body = LightState(power = "off")
+            api.setLightState("all", "Bearer $LIFX_API_TOKEN", body)
+            deviceNotifier.sendDeviceNotification(
+                deviceType = DeviceType.LIGHT,
+                eventType  = EventType.STATUS_CHANGE,
+                deviceName = "LIFX Smart Light",
+                additionalDetails = "Light turned OFF"
+            )
+        } catch (e: Exception) {
+            Log.e("DeviceController","Failed to turn off light", e)
+        }
+    }
 
     // Send the request and log the response
     private fun toggleShellyRelay(turnOn: Boolean) {

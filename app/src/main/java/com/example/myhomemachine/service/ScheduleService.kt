@@ -12,6 +12,10 @@ import androidx.core.app.NotificationCompat
 import com.example.myhomemachine.MainActivity
 import com.example.myhomemachine.R
 import com.example.myhomemachine.data.DeviceManager
+import com.example.myhomemachine.DeviceController
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 import java.util.Timer
@@ -39,12 +43,17 @@ class ScheduleService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Schedule service started")
 
-        // Set a timer to check schedules every minute
+        // Compute initial delay so the task runs exactly at the top of each minute
+        val now = System.currentTimeMillis()
+        val nextMinute = ((now / 60000) + 1) * 60000
+        val initialDelay = nextMinute - now
+
+        // Set a timer to check schedules every minute, aligned to the minute boundary
         timer.schedule(object : TimerTask() {
             override fun run() {
                 checkAndExecuteSchedules()
             }
-        }, 0, 60 * 1000) // Check every minute
+        }, initialDelay, 60 * 1000) // Check every minute
 
         return START_STICKY
     }
@@ -96,18 +105,18 @@ class ScheduleService : Service() {
         try {
             // Parse the device type from the schedule string
             val deviceType = when {
-                schedule.contains("(Light)") -> "Light"
-                schedule.contains("(Plug)") -> "Plug"
+                schedule.contains("(Light)")  -> "Light"
+                schedule.contains("(Plug)")   -> "Plug"
                 schedule.contains("(Camera)") -> "Camera"
                 schedule.contains("(Sensor)") -> "Sensor"
-                else -> "Unknown"
+                else                          -> "Unknown"
             }
 
             // Parse the action from the schedule string
             val action = when {
-                schedule.contains("turn ON") -> "ON"
+                schedule.contains("turn ON")  -> "ON"
                 schedule.contains("turn OFF") -> "OFF"
-                else -> "Unknown"
+                else                           -> "Unknown"
             }
 
             // Create an intent to broadcast the schedule execution
@@ -125,6 +134,26 @@ class ScheduleService : Service() {
             )
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.notify(schedule.hashCode(), notification)
+
+            // Control the device directly via your DeviceController
+            val controller = DeviceController(this)
+            when (deviceType) {
+                "Light" -> {
+                    if (action == "ON") {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            controller.turnOnLight()
+                        }
+                    } else {
+                        CoroutineScope(Dispatchers.IO).launch {
+                            controller.turnOffLight()
+                        }
+                    }
+                }
+                "Plug" -> {
+                    if (action == "ON") controller.turnOnPlug() else controller.turnOffPlug()
+                }
+                // Add other device types as needed
+            }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error executing schedule: ${e.message}")
